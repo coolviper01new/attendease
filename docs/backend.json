@@ -1,0 +1,548 @@
+{
+  "entities": {
+    "SchoolYear": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "SchoolYear",
+      "type": "object",
+      "description": "Represents an academic school year.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the School Year entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the school year (e.g., 2023-2024)."
+        },
+        "startDate": {
+          "type": "string",
+          "description": "Start date of the school year.",
+          "format": "date-time"
+        },
+        "endDate": {
+          "type": "string",
+          "description": "End date of the school year.",
+          "format": "date-time"
+        },
+        "isActive": {
+          "type": "boolean",
+          "description": "Indicates if the school year is currently active."
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "startDate",
+        "endDate",
+        "isActive"
+      ]
+    },
+    "Semester": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Semester",
+      "type": "object",
+      "description": "Represents a semester within a school year.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Semester entity."
+        },
+        "schoolYearId": {
+          "type": "string",
+          "description": "Reference to SchoolYear. (Relationship: SchoolYear 1:N Semester)"
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the semester (e.g., Fall, Spring)."
+        },
+        "startDate": {
+          "type": "string",
+          "description": "Start date of the semester.",
+          "format": "date-time"
+        },
+        "endDate": {
+          "type": "string",
+          "description": "End date of the semester.",
+          "format": "date-time"
+        },
+        "isActive": {
+          "type": "boolean",
+          "description": "Indicates if the semester is currently active."
+        }
+      },
+      "required": [
+        "id",
+        "schoolYearId",
+        "name",
+        "startDate",
+        "endDate",
+        "isActive"
+      ]
+    },
+    "YearLevel": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "YearLevel",
+      "type": "object",
+      "description": "Represents a year level (e.g., Freshman, Sophomore).",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the YearLevel entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the year level."
+        },
+        "description": {
+          "type": "string",
+          "description": "Description of the year level."
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "description"
+      ]
+    },
+    "Block": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Block",
+      "type": "object",
+      "description": "Represents a block or section of students.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Block entity."
+        },
+        "yearLevelId": {
+          "type": "string",
+          "description": "Reference to YearLevel. (Relationship: YearLevel 1:N Block)"
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the block."
+        },
+        "description": {
+          "type": "string",
+          "description": "Description of the block."
+        }
+      },
+      "required": [
+        "id",
+        "yearLevelId",
+        "name",
+        "description"
+      ]
+    },
+    "Subject": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Subject",
+      "type": "object",
+      "description": "Represents a subject or course.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Subject entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the subject."
+        },
+        "description": {
+          "type": "string",
+          "description": "Description of the subject."
+        },
+        "schedule": {
+          "type": "string",
+          "description": "Schedule details (day, time, room)."
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "description",
+        "schedule"
+      ]
+    },
+    "Registration": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Registration",
+      "type": "object",
+      "description": "Represents a student's registration in a subject.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Registration entity."
+        },
+        "studentId": {
+          "type": "string",
+          "description": "Reference to User (Student). (Relationship: User 1:N Registration)"
+        },
+        "subjectId": {
+          "type": "string",
+          "description": "Reference to Subject. (Relationship: Subject 1:N Registration)"
+        },
+        "blockId": {
+          "type": "string",
+          "description": "Reference to Block. (Relationship: Block 1:N Registration)"
+        },
+        "registrationDate": {
+          "type": "string",
+          "description": "Date of registration.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "studentId",
+        "subjectId",
+        "blockId",
+        "registrationDate"
+      ]
+    },
+    "AttendanceSession": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "AttendanceSession",
+      "type": "object",
+      "description": "Represents an attendance session for a subject.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the AttendanceSession entity."
+        },
+        "subjectId": {
+          "type": "string",
+          "description": "Reference to Subject. (Relationship: Subject 1:N AttendanceSession)"
+        },
+        "startTime": {
+          "type": "string",
+          "description": "Start time of the attendance session.",
+          "format": "date-time"
+        },
+        "endTime": {
+          "type": "string",
+          "description": "End time of the attendance session.",
+          "format": "date-time"
+        },
+        "isActive": {
+          "type": "boolean",
+          "description": "Indicates if the attendance session is currently active."
+        },
+        "qrCodeSecret": {
+          "type": "string",
+          "description": "Secret key used to generate and validate QR codes."
+        }
+      },
+      "required": [
+        "id",
+        "subjectId",
+        "startTime",
+        "endTime",
+        "isActive",
+        "qrCodeSecret"
+      ]
+    },
+    "Attendance": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Attendance",
+      "type": "object",
+      "description": "Represents a student's attendance record.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Attendance entity."
+        },
+        "attendanceSessionId": {
+          "type": "string",
+          "description": "Reference to AttendanceSession. (Relationship: AttendanceSession 1:N Attendance)"
+        },
+        "studentId": {
+          "type": "string",
+          "description": "Reference to User (Student). (Relationship: User 1:N Attendance)"
+        },
+        "timestamp": {
+          "type": "string",
+          "description": "Timestamp of the attendance record.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "attendanceSessionId",
+        "studentId",
+        "timestamp"
+      ]
+    },
+    "Warning": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Warning",
+      "type": "object",
+      "description": "Represents a warning issued to a student for excessive absences.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Warning entity."
+        },
+        "studentId": {
+          "type": "string",
+          "description": "Reference to User (Student). (Relationship: User 1:N Warning)"
+        },
+        "subjectId": {
+          "type": "string",
+          "description": "Reference to Subject. (Relationship: Subject 1:N Warning)"
+        },
+        "issueDate": {
+          "type": "string",
+          "description": "Date the warning was issued.",
+          "format": "date-time"
+        },
+        "reason": {
+          "type": "string",
+          "description": "Reason for the warning (e.g., consecutive absences)."
+        }
+      },
+      "required": [
+        "id",
+        "studentId",
+        "subjectId",
+        "issueDate",
+        "reason"
+      ]
+    },
+    "User": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "User",
+      "type": "object",
+      "description": "Represents a user of the system (student or admin).",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the User entity."
+        },
+        "email": {
+          "type": "string",
+          "description": "User's email address.",
+          "format": "email"
+        },
+        "firstName": {
+          "type": "string",
+          "description": "User's first name."
+        },
+        "lastName": {
+          "type": "string",
+          "description": "User's last name."
+        },
+        "role": {
+          "type": "string",
+          "description": "User's role (e.g., student, admin)."
+        }
+      },
+      "required": [
+        "id",
+        "email",
+        "firstName",
+        "lastName",
+        "role"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "schoolYears/{schoolYearId}",
+        "definition": {
+          "entityName": "SchoolYear",
+          "schema": {
+            "$ref": "#/backend/entities/SchoolYear"
+          },
+          "description": "Stores school year data. Includes the fields: id, name, startDate, endDate and isActive.",
+          "params": [
+            {
+              "name": "schoolYearId",
+              "description": "The unique identifier for the school year."
+            }
+          ]
+        }
+      },
+      {
+        "path": "schoolYears/{schoolYearId}/semesters/{semesterId}",
+        "definition": {
+          "entityName": "Semester",
+          "schema": {
+            "$ref": "#/backend/entities/Semester"
+          },
+          "description": "Stores semester data within a school year. Includes the fields: id, schoolYearId, name, startDate, endDate and isActive. `schoolYearId` is denormalized for authorization independence.",
+          "params": [
+            {
+              "name": "schoolYearId",
+              "description": "The unique identifier for the school year."
+            },
+            {
+              "name": "semesterId",
+              "description": "The unique identifier for the semester."
+            }
+          ]
+        }
+      },
+      {
+        "path": "yearLevels/{yearLevelId}",
+        "definition": {
+          "entityName": "YearLevel",
+          "schema": {
+            "$ref": "#/backend/entities/YearLevel"
+          },
+          "description": "Stores year level data. Includes the fields: id, name and description.",
+          "params": [
+            {
+              "name": "yearLevelId",
+              "description": "The unique identifier for the year level."
+            }
+          ]
+        }
+      },
+      {
+        "path": "yearLevels/{yearLevelId}/blocks/{blockId}",
+        "definition": {
+          "entityName": "Block",
+          "schema": {
+            "$ref": "#/backend/entities/Block"
+          },
+          "description": "Stores block data within a year level. Includes the fields: id, yearLevelId, name, and description. `yearLevelId` is denormalized for authorization independence.",
+          "params": [
+            {
+              "name": "yearLevelId",
+              "description": "The unique identifier for the year level."
+            },
+            {
+              "name": "blockId",
+              "description": "The unique identifier for the block."
+            }
+          ]
+        }
+      },
+      {
+        "path": "subjects/{subjectId}",
+        "definition": {
+          "entityName": "Subject",
+          "schema": {
+            "$ref": "#/backend/entities/Subject"
+          },
+          "description": "Stores subject data. Includes the fields: id, name, description and schedule.",
+          "params": [
+            {
+              "name": "subjectId",
+              "description": "The unique identifier for the subject."
+            }
+          ]
+        }
+      },
+      {
+        "path": "users/{userId}/registrations/{registrationId}",
+        "definition": {
+          "entityName": "Registration",
+          "schema": {
+            "$ref": "#/backend/entities/Registration"
+          },
+          "description": "Stores student registrations within a user profile. Includes the fields: id, studentId, subjectId, blockId and registrationDate.  `studentId` is implicitly the `userId` from the path.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier for the user (student)."
+            },
+            {
+              "name": "registrationId",
+              "description": "The unique identifier for the registration."
+            }
+          ]
+        }
+      },
+      {
+        "path": "subjects/{subjectId}/attendanceSessions/{attendanceSessionId}",
+        "definition": {
+          "entityName": "AttendanceSession",
+          "schema": {
+            "$ref": "#/backend/entities/AttendanceSession"
+          },
+          "description": "Stores attendance session data for a subject. Includes the fields: id, subjectId, startTime, endTime, isActive, and qrCodeSecret. `subjectId` is denormalized for authorization independence.",
+          "params": [
+            {
+              "name": "subjectId",
+              "description": "The unique identifier for the subject."
+            },
+            {
+              "name": "attendanceSessionId",
+              "description": "The unique identifier for the attendance session."
+            }
+          ]
+        }
+      },
+      {
+        "path": "subjects/{subjectId}/attendanceSessions/{attendanceSessionId}/attendance/{attendanceId}",
+        "definition": {
+          "entityName": "Attendance",
+          "schema": {
+            "$ref": "#/backend/entities/Attendance"
+          },
+          "description": "Stores attendance records for a specific attendance session. Includes the fields: id, attendanceSessionId, studentId and timestamp. `attendanceSessionId` and `subjectId` are denormalized from the parent collections for authorization independence.",
+          "params": [
+            {
+              "name": "subjectId",
+              "description": "The unique identifier for the subject."
+            },
+            {
+              "name": "attendanceSessionId",
+              "description": "The unique identifier for the attendance session."
+            },
+            {
+              "name": "attendanceId",
+              "description": "The unique identifier for the attendance record."
+            }
+          ]
+        }
+      },
+      {
+        "path": "users/{userId}/warnings/{warningId}",
+        "definition": {
+          "entityName": "Warning",
+          "schema": {
+            "$ref": "#/backend/entities/Warning"
+          },
+          "description": "Stores warnings issued to a student. Includes the fields: id, studentId, subjectId, issueDate and reason. `studentId` is implicitly the `userId` from the path.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier for the user (student)."
+            },
+            {
+              "name": "warningId",
+              "description": "The unique identifier for the warning."
+            }
+          ]
+        }
+      },
+      {
+        "path": "users/{userId}",
+        "definition": {
+          "entityName": "User",
+          "schema": {
+            "$ref": "#/backend/entities/User"
+          },
+          "description": "Stores user data. Includes the fields: id, email, firstName, lastName, and role.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier for the user."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "The Firestore structure is designed to support the AttendEase application, focusing on secure and efficient data access. It utilizes path-based ownership for user-specific data and membership maps for collaborative entities.  Authorization Independence is achieved by denormalizing relevant authorization data (e.g., members map, owner ID) into subcollections where needed, eliminating the need for `get()` calls in security rules. Segregation is applied by dedicating collections to different access levels (e.g., user profiles vs. shared projects).  The structure facilitates QAPs (Rules Are Not Filters) by ensuring that list operations can be securely performed without relying on client-side filtering, thanks to the clear segregation of data based on ownership and role-based access control. Data integrity is ensured through explicit modeling of states and consistent naming conventions."
+  }
+}

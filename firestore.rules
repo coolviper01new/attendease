@@ -1,0 +1,226 @@
+/**
+ * @file firestore.rules
+ * @description Security rules for the AttendEase Firestore database.
+ *
+ * @version 2
+ *
+ * @summary
+ * This ruleset implements a role-based access control (RBAC) model combined with
+ * user ownership for data security.
+ *
+ * @philosophy
+ * - Core Philosophy: The security model distinguishes between two user roles: 'admin' and 'student'.
+ *   Admins have broad permissions to manage core academic data, while students have restricted
+ *   access, primarily to their own personal data and read-only access to public academic info.
+ * - Data Structure: User-specific data (like registrations and warnings) is strictly segregated
+ *   and nested under `/users/{userId}` to leverage path-based security. Core academic data
+ *   (like subjects and school years) is stored in top-level collections for broader read access.
+ * - Key Security Decisions:
+ *   - User profile data is private; users can only access their own document.
+ *   - Listing all users is explicitly disallowed to protect user privacy.
+ *   - Academic data (`schoolYears`, `subjects`, etc.) is read-only for all signed-in users but
+ *     can only be modified by users with the 'admin' role.
+ *   - Students can create their own attendance records but cannot view, edit, or delete the records
+ *     of other students.
+ * - Denormalization for Authorization: Student and user IDs (e.g., `studentId`) are
+ *   denormalized onto documents like `registrations` and `attendance` records. This allows for
+ *   fast, efficient ownership checks directly within the rule without requiring costly `get()` calls
+ *   to other documents.
+ */
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    /*********************************************************************
+     *                                                                   *
+     *                      HELPER FUNCTIONS                             *
+     *                                                                   *
+     *********************************************************************/
+
+    /**
+     * @function isSignedIn
+     * @description Checks if the user is authenticated.
+     * @returns {boolean} True if a user is signed in.
+     */
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    /**
+     * @function isOwner
+     * @description Checks if the authenticated user's UID matches the given userId.
+     * @param {string} userId - The user ID to check against.
+     * @returns {boolean} True if the requester is the owner.
+     */
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    /**
+     * @function isAdmin
+     * @description Checks if the authenticated user has the 'admin' role in their user document.
+     *              This requires one `get` call per request.
+     * @returns {boolean} True if the user is an admin.
+     */
+    function isAdmin() {
+      return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    /**
+     * @function isExistingDoc
+     * @description Checks if a document currently exists. Used to protect update/delete operations.
+     * @returns {boolean} True if `resource` is not null.
+     */
+    function isExistingDoc() {
+      return resource != null;
+    }
+
+    /*********************************************************************
+     *                                                                   *
+     *                      USER DATA RULES                              *
+     *                                                                   *
+     *********************************************************************/
+
+    /**
+     * @description Manages user profile documents.
+     * @path /users/{userId}
+     * @allow (create) A new user can create their own profile document.
+     * @deny (get) A user cannot read another user's profile.
+     * @deny (list) Listing all users is forbidden.
+     * @deny (update) A user cannot change their assigned role.
+     * @principle Restricts access to a user's own data tree and ensures role immutability.
+     */
+    match /users/{userId} {
+      allow get: if isOwner(userId) || isAdmin();
+      allow list: if false;
+      allow create: if isOwner(userId) && request.resource.data.id == userId;
+      allow update: if (isOwner(userId) || isAdmin()) && isExistingDoc() && request.resource.data.id == resource.data.id && request.resource.data.role == resource.data.role;
+      allow delete: if isAdmin() && isExistingDoc();
+    }
+
+    /**
+     * @description Manages a student's subject registrations.
+     * @path /users/{userId}/registrations/{registrationId}
+     * @allow (create) A student can create a registration for themselves.
+     * @allow (list) A student can list their own registrations.
+     * @deny (get) A student cannot read registrations belonging to another user.
+     * @principle Enforces document ownership within a user's private subcollection.
+     */
+    match /users/{userId}/registrations/{registrationId} {
+      allow get, list: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId) && request.resource.data.studentId == userId;
+      allow update: if isOwner(userId) && isExistingDoc() && request.resource.data.studentId == resource.data.studentId;
+      allow delete: if isOwner(userId) && isExistingDoc();
+    }
+
+    /**
+     * @description Manages warnings issued to a student.
+     * @path /users/{userId}/warnings/{warningId}
+     * @allow (get, list) A student can read their own warnings. An admin can read any warning.
+     * @allow (create) An admin can create a warning for a student.
+     * @deny (create) A student cannot create a warning for themselves.
+     * @deny (delete) A student cannot delete their own warnings.
+     * @principle Allows admins to write into a user's private space, which the user can only read.
+     */
+    match /users/{userId}/warnings/{warningId} {
+      allow get, list: if isOwner(userId) || isAdmin();
+      allow create: if isAdmin() && request.resource.data.studentId == userId;
+      allow update: if isAdmin() && isExistingDoc() && request.resource.data.studentId == resource.data.studentId;
+      allow delete: if isAdmin() && isExistingDoc();
+    }
+
+
+    /*********************************************************************
+     *                                                                   *
+     *                    ACADEMIC DATA RULES                            *
+     *                                                                   *
+     *********************************************************************/
+
+    /**
+     * @description Manages core academic data like School Years and Semesters.
+     * @path /schoolYears/{schoolYearId} and its subcollections.
+     * @allow (get, list) Any signed-in user can read academic year and semester data.
+     * @allow (create, update, delete) Only admins can modify this data.
+     * @deny (create) A non-admin user cannot create a new school year.
+     * @principle Provides public read access for reference data while restricting writes to admins.
+     */
+    match /schoolYears/{schoolYearId} {
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isAdmin();
+
+      match /semesters/{semesterId} {
+        allow get, list: if isSignedIn();
+        allow create, update, delete: if isAdmin();
+      }
+    }
+
+    /**
+     * @description Manages core academic data like Year Levels and Blocks.
+     * @path /yearLevels/{yearLevelId} and its subcollections.
+     * @allow (get, list) Any signed-in user can read year level and block data.
+     * @allow (create, update, delete) Only admins can modify this data.
+     * @deny (create) A non-admin user cannot create a new year level.
+     * @principle Provides public read access for reference data while restricting writes to admins.
+     */
+    match /yearLevels/{yearLevelId} {
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isAdmin();
+
+      match /blocks/{blockId} {
+        allow get, list: if isSignedIn();
+        allow create, update, delete: if isAdmin();
+      }
+    }
+
+    /**
+     * @description Manages subject/course information.
+     * @path /subjects/{subjectId}
+     * @allow (get, list) Any signed-in user can read subject data.
+     * @allow (create, update, delete) Only admins can modify this data.
+     * @deny (create) A non-admin user cannot create a new subject.
+     * @principle Provides public read access for reference data while restricting writes to admins.
+     */
+    match /subjects/{subjectId} {
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isAdmin();
+    }
+
+
+    /*********************************************************************
+     *                                                                   *
+     *                      ATTENDANCE RULES                             *
+     *                                                                   *
+     *********************************************************************/
+
+    /**
+     * @description Manages attendance sessions for a subject.
+     * @path /subjects/{subjectId}/attendanceSessions/{attendanceSessionId}
+     * @allow (get, list) Any signed-in user can read session data to check for active sessions.
+     * @allow (create, update, delete) Only admins can create or manage attendance sessions.
+     * @deny (create) A student cannot start an attendance session.
+     * @principle Restricts management of sensitive operations to admins, while allowing read access for participants.
+     */
+    match /subjects/{subjectId}/attendanceSessions/{attendanceSessionId} {
+      allow get, list: if isSignedIn();
+      allow create: if isAdmin();
+      allow update, delete: if isAdmin() && isExistingDoc();
+
+      /**
+       * @description Manages individual student attendance records for a session.
+       * @path /subjects/{subjectId}/attendanceSessions/{attendanceSessionId}/attendance/{attendanceId}
+       * @allow (create) A signed-in student can create their own attendance record.
+       * @allow (get) A student can read their own attendance record.
+       * @deny (list) A student cannot list all attendance records in a session to protect privacy.
+       * @deny (update, delete) A student cannot modify their attendance record once submitted.
+       * @principle Enforces document ownership for writes and reads, and prevents data enumeration.
+       */
+      match /attendance/{attendanceId} {
+        allow get: if isOwner(resource.data.studentId) || isAdmin();
+        allow list: if false;
+        allow create: if isSignedIn() && request.resource.data.studentId == request.auth.uid;
+        allow update: if false;
+        allow delete: if isAdmin() && isExistingDoc();
+      }
+    }
+  }
+}
