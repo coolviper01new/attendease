@@ -68,8 +68,10 @@ export default function SubjectAttendancePage() {
             snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Student & {id: string}))
         );
 
-        setRegisteredStudents(students);
-        setAreStudentsLoading(false);
+        if (isMounted) {
+          setRegisteredStudents(students);
+          setAreStudentsLoading(false);
+        }
 
       } else if (!areRegistrationsLoading) {
         if (isMounted) {
