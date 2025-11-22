@@ -5,7 +5,7 @@
 import { ColumnDef } from "@tanstack/react-table";
 import type { Subject, AttendanceSession as TAttendanceSession, Registration } from "@/lib/types";
 import { Button } from "@/components/ui/button";
-import { ArrowUpDown, MoreHorizontal, QrCode, PlayCircle, Clock, Trash2 } from "lucide-react";
+import { ArrowUpDown, MoreHorizontal, QrCode, PlayCircle, Clock, Trash2, ExternalLink } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -283,8 +283,11 @@ const ActionsCell = ({ row, onEdit, onRefresh }: { row: any, onEdit: (subject: S
                 <EnrollmentQrCodeDialog subject={subject} />
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
-            <DropdownMenuItem asChild>
-              <Link href={`/attendance/${subject.id}`} target="_blank">View Attendance</Link>
+             <DropdownMenuItem asChild>
+              <Link href={`/attendance/${subject.id}`} target="_blank" className="flex items-center gap-2">
+                <ExternalLink className="h-4 w-4" />
+                Open Attendance Scanner
+              </Link>
             </DropdownMenuItem>
              <DeleteSubjectAction subject={subject} onDeleted={onRefresh} />
           </DropdownMenuContent>
@@ -312,10 +315,10 @@ export const getColumns = ({ onEdit, onRefresh }: GetColumnsProps): ColumnDef<Su
         {row.getIsGrouped() ? (
           <div className="font-bold">{row.getValue("name")}</div>
         ) : (
-          <Link href={`/attendance/${row.original.id}`} className="hover:underline" target="_blank">
+          <div>
             <div className="font-medium">{row.original.name}</div>
             <div className="text-xs text-muted-foreground">{row.original.code}</div>
-          </Link>
+          </div>
         )}
       </div>
     ),
@@ -404,5 +407,3 @@ export const getColumns = ({ onEdit, onRefresh }: GetColumnsProps): ColumnDef<Su
     cell: (props) => <ActionsCell {...props} onEdit={onEdit} onRefresh={onRefresh} />,
   },
 ];
-
-    

@@ -4,9 +4,19 @@ import { firebaseConfig } from '@/firebase/config';
 import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore'
+import { adminApp } from './admin';
 
 // IMPORTANT: DO NOT MODIFY THIS FUNCTION
 export function initializeFirebase() {
+  if (typeof window === 'undefined') {
+    // Return admin app for server-side rendering
+    return {
+      firebaseApp: adminApp(),
+      auth: getAuth(adminApp()),
+      firestore: getFirestore(adminApp()),
+    };
+  }
+  
   if (!getApps().length) {
     // Important! initializeApp() is called without any arguments because Firebase App Hosting
     // integrates with the initializeApp() function to provide the environment variables needed to
