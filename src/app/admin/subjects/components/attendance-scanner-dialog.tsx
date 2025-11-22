@@ -28,7 +28,6 @@ import {
   CheckCircle,
 } from 'lucide-react';
 import QrScanner from 'qr-scanner';
-import { useToast } from '@/hooks/use-toast';
 import { useCollection, useFirestore, useUser, useMemoFirebase, useDoc } from '@/firebase';
 import {
   doc,
@@ -68,7 +67,6 @@ export function AttendanceScannerDialog({
 }: AttendanceScannerDialogProps) {
   const firestore = useFirestore();
   const { user: adminUser } = useUser();
-  const { toast } = useToast();
   const videoRef = useRef<HTMLVideoElement>(null);
   const qrScannerRef = useRef<QrScanner | null>(null);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -85,6 +83,8 @@ export function AttendanceScannerDialog({
     (Student & { id: string })[]
   >([]);
   const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
+  const [alertInfo, setAlertInfo] = useState<{title: string, description: string, variant: 'default' | 'destructive'} | null>(null);
+
 
   // --- Data Fetching Hooks ---
   const activeSessionQuery = useMemoFirebase(
@@ -149,7 +149,7 @@ export function AttendanceScannerDialog({
 
   const handleStopSession = useCallback(async () => {
     if (!activeSession) {
-      toast({ title: 'No active session to stop.' });
+      setAlertInfo({ title: 'No active session to stop.', description: '', variant: 'default' });
       return;
     }
     const sessionRef = doc(
@@ -172,12 +172,10 @@ export function AttendanceScannerDialog({
         )
     });
 
-    // Don't clear students on session stop, they remain present for the day.
-    toast({ title: 'Attendance Session Stopped' });
+    setAlertInfo({ title: 'Attendance Session Stopped', description: '', variant: 'default'});
     if(intervalRef.current) clearInterval(intervalRef.current);
     setTimeRemaining(null);
-    onRefresh();
-  }, [activeSession, firestore, subject.id, onRefresh, toast]);
+  }, [activeSession, firestore, subject.id]);
 
 
   // Countdown timer effect
@@ -238,7 +236,7 @@ export function AttendanceScannerDialog({
         } catch (error) {
           console.error('Error accessing camera:', error);
           setHasCameraPermission(false);
-          toast({
+          setAlertInfo({
             variant: 'destructive',
             title: 'Camera Access Denied',
             description: 'Please enable camera permissions in your browser settings to use this feature.',
@@ -260,7 +258,7 @@ export function AttendanceScannerDialog({
         videoRef.current.srcObject = null;
       }
     };
-  }, [open, hasCameraPermission, toast]);
+  }, [open, hasCameraPermission]);
 
   useEffect(() => {
     if (videoRef.current && hasCameraPermission && !qrScannerRef.current) {
@@ -292,12 +290,13 @@ export function AttendanceScannerDialog({
       return;
 
     setIsProcessing(true);
+    setAlertInfo(null);
 
     try {
       const qrData = JSON.parse(scannedData);
 
       if (presentStudents.some((p) => p.id === qrData.studentId)) {
-        toast({
+        setAlertInfo({
           variant: 'destructive',
           title: 'Already Marked',
           description: 'This student has already been marked present.',
@@ -347,24 +346,22 @@ export function AttendanceScannerDialog({
                 )
             });
         } else {
-             toast({
+             setAlertInfo({
               variant: 'destructive',
               title: 'Student Not Found',
               description: 'The student ID from the QR code does not exist in the system.',
             });
         }
       } else {
-        toast({
+        setAlertInfo({
           variant: 'destructive',
           title: 'Invalid QR Code',
           description: result.reason || 'Could not validate attendance.',
         });
       }
     } catch (error: any) {
-        // This catch block is for JSON parsing errors or other unexpected issues,
-        // not for Firestore permissions, which are handled in the .catch() blocks.
         console.error('Error processing QR code:', error);
-        toast({
+        setAlertInfo({
         variant: 'destructive',
         title: 'Scan Error',
         description: 'The scanned QR code is not valid for this system.',
@@ -374,6 +371,7 @@ export function AttendanceScannerDialog({
         setIsProcessing(false);
         setScannedData(null);
         setConfirmationMessage(null); // Clear confirmation message
+        setAlertInfo(null);
       }, 3000); // 3-second cooldown
     }
   }, [
@@ -383,7 +381,6 @@ export function AttendanceScannerDialog({
     adminUser,
     firestore,
     subject.id,
-    toast,
     presentStudents,
     todayDateString
   ]);
@@ -394,7 +391,7 @@ export function AttendanceScannerDialog({
 
   const handleStartSession = async () => {
     if (activeSession) {
-      toast({ title: 'Session already active.' });
+      setAlertInfo({ title: 'Session already active.', description: '', variant: 'default' });
       return;
     }
     const newSessionSecret = `secret-${subject.id}-${Date.now()}`;
@@ -422,9 +419,10 @@ export function AttendanceScannerDialog({
     });
 
     setTimeRemaining(20 * 60); // Start 20 minute timer
-    toast({
+    setAlertInfo({
       title: 'Attendance Session Started',
       description: 'You can now start scanning student QR codes.',
+      variant: 'default',
     });
     refreshSessions();
   };
@@ -449,12 +447,6 @@ export function AttendanceScannerDialog({
         <DialogHeader className="text-center">
           <DialogTitle className="text-3xl font-bold font-headline">Attendance Scanner</DialogTitle>
           <DialogDescription className="text-lg text-muted-foreground">{subject.name} ({subject.code})</DialogDescription>
-           <Alert className="mt-4 bg-primary/5 border-primary/20 text-center">
-              <AlertTitle className="font-semibold text-primary text-2xl">Welcome Student!</AlertTitle>
-              <AlertDescription className="text-foreground/80 text-lg">
-                Please show your Subject QR Code Generated at least 1 foot to the device camera. Thank you
-              </AlertDescription>
-            </Alert>
         </DialogHeader>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start h-full overflow-hidden">
           {/* Left Column: Scanner and Controls */}
@@ -470,8 +462,8 @@ export function AttendanceScannerDialog({
 
               {confirmationMessage && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-green-600/90 text-white p-4 text-center">
-                    <CheckCircle className="h-16 w-16 mb-4" />
-                    <p className="text-3xl font-bold">{confirmationMessage}</p>
+                    <CheckCircle className="h-24 w-24 mb-4" />
+                    <p className="text-5xl font-bold">{confirmationMessage}</p>
                 </div>
               )}
 
@@ -526,6 +518,12 @@ export function AttendanceScannerDialog({
                   </>
                 )}
             </div>
+            {alertInfo && (
+              <Alert variant={alertInfo.variant} className="flex-shrink-0">
+                <AlertTitle>{alertInfo.title}</AlertTitle>
+                {alertInfo.description && <AlertDescription>{alertInfo.description}</AlertDescription>}
+              </Alert>
+            )}
              <Card className="flex-shrink-0">
                 <CardHeader className="pb-4 text-center">
                   <p className="text-2xl font-bold">{currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
@@ -586,5 +584,3 @@ export function AttendanceScannerDialog({
     </Dialog>
   );
 }
-
-    

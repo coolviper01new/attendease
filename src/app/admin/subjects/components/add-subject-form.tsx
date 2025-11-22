@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -26,7 +25,6 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { useFirestore } from '@/firebase';
 import { addDoc, collection, doc, setDoc, writeBatch, query, where, getDocs, deleteDoc, updateDoc } from 'firebase/firestore';
-import { useToast } from '@/hooks/use-toast';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Copy, PlusCircle, Trash2 } from 'lucide-react';
 import type { Subject, Registration } from '@/lib/types';
@@ -34,6 +32,7 @@ import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 const schoolYearRegex = /^\d{4}-\d{4}$/;
 
@@ -77,7 +76,7 @@ interface AddSubjectFormProps {
 
 const ScheduleArray = ({ control, name, label, description }: { control: any, name: "lectureSchedules" | "labSchedules", label: string, description: string }) => {
     const { fields, append, remove, update } = useFieldArray({ control, name });
-    const { toast } = useToast();
+    const [alert, setAlert] = useState<{variant: 'default' | 'destructive', title: string, description: string} | null>(null);
 
     const handleDayCheckedChange = (checked: boolean, day: string) => {
         const fieldIndex = fields.findIndex(field => (field as any).day === day);
@@ -113,24 +112,32 @@ const ScheduleArray = ({ control, name, label, description }: { control: any, na
                 endTime: sourceSchedule.endTime,
                 room: sourceSchedule.room,
             });
-            toast({
+            setAlert({
+                variant: 'default',
                 title: 'Schedule Copied',
                 description: `Schedule from ${sourceSchedule.day} has been copied to ${targetDay}.`,
             });
           }
       } else {
-          toast({
+          setAlert({
               variant: 'destructive',
               title: 'Cannot Copy',
               description: 'There is no previous checked day to copy from.',
           });
       }
+      setTimeout(() => setAlert(null), 3000);
     };
 
     return (
         <div className="space-y-4 rounded-md border p-4">
           <FormLabel>{label}</FormLabel>
           <FormDescription className="!mt-0 mb-2">{description}</FormDescription>
+           {alert && (
+            <Alert variant={alert.variant} className="mb-4">
+              <AlertTitle>{alert.title}</AlertTitle>
+              <AlertDescription>{alert.description}</AlertDescription>
+            </Alert>
+          )}
           <div className="space-y-4">
             {daysOfWeek.map((day) => {
               const fieldIndex = fields.findIndex(f => (f as any).day === day);
@@ -224,8 +231,7 @@ const ScheduleArray = ({ control, name, label, description }: { control: any, na
 export function AddSubjectForm({ onSuccess, subject }: AddSubjectFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const firestore = useFirestore();
-  const { toast } = useToast();
-
+  
   const isEditMode = !!subject;
   const isEnrollmentOpen = isEditMode && subject.enrollmentStatus === 'open';
 
@@ -293,10 +299,6 @@ export function AddSubjectForm({ onSuccess, subject }: AddSubjectFormProps) {
     if (isEditMode && subject) {
         const subjectDocRef = doc(subjectsRef, subject.id);
         updateDoc(subjectDocRef, subjectData).then(() => {
-            toast({
-                title: 'Subject Updated',
-                description: `Details for ${values.name} (${values.block}) have been updated.`,
-            });
             onSuccess();
         }).catch(error => {
             errorEmitter.emit('permission-error', new FirestorePermissionError({
@@ -309,10 +311,6 @@ export function AddSubjectForm({ onSuccess, subject }: AddSubjectFormProps) {
         });
     } else {
         addDoc(subjectsRef, subjectData).then(() => {
-            toast({
-                title: 'Subject Created',
-                description: `${values.name} (${values.block}) has been created successfully.`,
-            });
             onSuccess();
         }).catch(error => {
             errorEmitter.emit('permission-error', new FirestorePermissionError({
@@ -488,5 +486,3 @@ export function AddSubjectForm({ onSuccess, subject }: AddSubjectFormProps) {
     </Form>
   );
 }
-
-    

@@ -19,14 +19,15 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { AddSubjectForm } from "./components/add-subject-form";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 export default function AdminSubjectsPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingSubject, setEditingSubject] = useState<Subject | null>(null);
+  const [pageAlert, setPageAlert] = useState<{title: string, description: string} | null>(null);
   
   const firestore = useFirestore();
   
-  // Query now filters out soft-deleted subjects
   const subjectsQuery = useMemoFirebase(() => query(collection(firestore, 'subjects')), [firestore]);
   const { data: subjects, isLoading, forceRefresh } = useCollection<Subject>(subjectsQuery);
 
@@ -41,14 +42,20 @@ export default function AdminSubjectsPage() {
   }
 
   const handleSuccess = () => {
+    const alertTitle = editingSubject ? 'Subject Updated' : 'Subject Created';
+    const alertDesc = editingSubject 
+        ? `Details for ${editingSubject.name} (${editingSubject.block}) have been updated.`
+        : 'A new subject has been created successfully.';
+
     setIsDialogOpen(false);
     setEditingSubject(null);
     forceRefresh();
+    setPageAlert({ title: alertTitle, description: alertDesc });
+    setTimeout(() => setPageAlert(null), 4000);
   }
   
   const combinedSubjects = useMemo(() => {
     if (!subjects) return [];
-    // Ensure we are not showing any subjects that might have been soft-deleted
     return subjects.filter(subject => !subject.deleted);
   }, [subjects]);
 
@@ -62,6 +69,13 @@ export default function AdminSubjectsPage() {
           <PlusCircle className="mr-2 h-4 w-4" /> Add New Subject
         </Button>
       </PageHeader>
+
+       {pageAlert && (
+          <Alert className="mb-4">
+            <AlertTitle>{pageAlert.title}</AlertTitle>
+            <AlertDescription>{pageAlert.description}</AlertDescription>
+          </Alert>
+        )}
 
       <Dialog open={isDialogOpen} onOpenChange={(isOpen) => {
           if (!isOpen) {

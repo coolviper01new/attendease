@@ -14,22 +14,22 @@ import {
 } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { AppWindow } from 'lucide-react';
+import { AppWindow, AlertTriangle } from 'lucide-react';
 import { useAuth, useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { doc } from 'firebase/firestore';
-import { useToast } from '@/hooks/use-toast';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   
   const router = useRouter();
   const auth = useAuth();
   const firestore = useFirestore();
   const { user, isUserLoading } = useUser();
-  const { toast } = useToast();
 
   const userDocRef = useMemoFirebase(() => {
       if (!user) return null;
@@ -39,12 +39,9 @@ export default function LoginPage() {
 
 
   const handleSignIn = async () => {
+    setError(null);
     if (!email || !password) {
-      toast({
-        variant: 'destructive',
-        title: 'Missing Fields',
-        description: 'Please enter both email and password.',
-      });
+      setError('Please enter both email and password.');
       return;
     }
     setIsSubmitting(true);
@@ -53,12 +50,8 @@ export default function LoginPage() {
       // onAuthStateChanged + useEffect below will handle the redirect
     } catch (error: any) {
       console.error(error);
-       toast({
-        variant: "destructive",
-        title: "Sign in failed",
-        description: "Invalid email or password. Please try again.",
-      });
-       setIsSubmitting(false);
+      setError("Invalid email or password. Please try again.");
+      setIsSubmitting(false);
     }
   };
 
@@ -102,6 +95,13 @@ export default function LoginPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4">
+          {error && (
+            <Alert variant="destructive">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertTitle>Sign-in Failed</AlertTitle>
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
           <div className="grid gap-2">
             <Label htmlFor="email">Email</Label>
             <Input

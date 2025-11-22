@@ -22,12 +22,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { AppWindow } from 'lucide-react';
+import { AppWindow, AlertTriangle } from 'lucide-react';
 import { useAuth, useFirestore } from '@/firebase';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { doc } from 'firebase/firestore';
-import { useToast } from '@/hooks/use-toast';
 import { setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 export default function RegisterPage() {
   const [email, setEmail] = useState('');
@@ -44,13 +44,14 @@ export default function RegisterPage() {
   const [facultyId, setFacultyId] = useState('');
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const router = useRouter();
   const auth = useAuth();
   const firestore = useFirestore();
-  const { toast } = useToast();
 
   const handleRegister = async () => {
+    setError(null);
     let missingFields = !firstName || !lastName || !email || !password;
     if (role === 'student' && (!course || !studentNumber)) {
         missingFields = true;
@@ -60,11 +61,7 @@ export default function RegisterPage() {
     }
 
     if (missingFields) {
-      toast({
-        variant: 'destructive',
-        title: 'Missing Fields',
-        description: 'Please fill out all required fields.',
-      });
+      setError('Please fill out all required fields.');
       return;
     }
     setIsSubmitting(true);
@@ -94,14 +91,9 @@ export default function RegisterPage() {
       
       const userDocRef = doc(firestore, 'users', user.uid);
       
-      // Use non-blocking write to create user profile
       setDocumentNonBlocking(userDocRef, userProfile, { merge: false });
 
-      toast({
-        title: 'Registration Successful',
-        description: "You've successfully created an account.",
-      });
-
+      // Since we navigate away, a toast is not suitable. The next page can show a welcome message.
       if (role === 'admin') {
         router.push('/admin/dashboard');
       } else {
@@ -116,11 +108,7 @@ export default function RegisterPage() {
       } else if (error.code === 'auth/weak-password') {
         errorMessage = 'The password is too weak. Please use at least 6 characters.';
       }
-      toast({
-        variant: 'destructive',
-        title: 'Registration Failed',
-        description: errorMessage,
-      });
+      setError(errorMessage);
     } finally {
         setIsSubmitting(false);
     }
@@ -146,6 +134,13 @@ export default function RegisterPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4">
+           {error && (
+            <Alert variant="destructive">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertTitle>Registration Failed</AlertTitle>
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
           <div className="grid gap-2">
             <Label>I am a...</Label>
             <RadioGroup defaultValue="student" value={role} onValueChange={(value: 'student' | 'admin') => setRole(value)} className="flex gap-4">

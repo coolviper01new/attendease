@@ -1,6 +1,5 @@
 import type {Metadata} from 'next';
 import './globals.css';
-import { Toaster } from "@/components/ui/toaster";
 import { Inter, Space_Grotesk as SpaceGrotesk } from 'next/font/google';
 import { cn } from '@/lib/utils';
 import { Providers } from './providers';
@@ -30,7 +29,6 @@ export default function RootLayout({
       <body className={cn(fontBody.variable, fontHeadline.variable, "font-body antialiased")}>
         <Providers>
           {children}
-          <Toaster />
         </Providers>
       </body>
     </html>

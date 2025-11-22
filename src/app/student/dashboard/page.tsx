@@ -23,7 +23,6 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { useToast } from '@/hooks/use-toast';
 import { useUser, useFirestore, useDoc, useCollection, useMemoFirebase } from '@/firebase';
 import { doc, collection, query, where, getDocs, updateDoc, getDoc } from 'firebase/firestore';
 import type { Student, Subject, Registration, Schedule, AttendanceSession, Attendance } from '@/lib/types';
@@ -260,12 +259,12 @@ const SubjectCard = ({ subject, student, isClient, isDeviceRegistered, isCurrent
 export default function StudentDashboardPage() {
   const { user, isUserLoading } = useUser();
   const firestore = useFirestore();
-  const { toast } = useToast();
-
+  
   const [currentDeviceId, setCurrentDeviceId] = useState<string | null>(null);
   const [isClient, setIsClient] = useState(false);
   const [enrolledSubjects, setEnrolledSubjects] = useState<Subject[]>([]);
   const [areSubjectsLoading, setAreSubjectsLoading] = useState(true);
+  const [deviceRegAlert, setDeviceRegAlert] = useState<string | null>(null);
 
   const userDocRef = useMemoFirebase(() => {
       if (!user) return null;
@@ -332,10 +331,7 @@ export default function StudentDashboardPage() {
     const deviceData = { deviceId: currentDeviceId };
     
     updateDoc(userDocRef, deviceData).then(() => {
-      toast({
-          title: "Device Registered",
-          description: "This device has been successfully registered for QR code generation.",
-      });
+      setDeviceRegAlert("This device has been successfully registered for QR code generation.");
     }).catch(error => {
       errorEmitter.emit('permission-error', new FirestorePermissionError({
         path: userDocRef.path,
@@ -393,7 +389,14 @@ export default function StudentDashboardPage() {
         description={`Welcome back, ${student?.firstName || 'student'}! Here's what's happening.`}
       />
 
-      {isClient && !isDeviceRegistered && (
+      {deviceRegAlert && (
+        <Alert className="mb-6">
+          <AlertTitle>Device Registered</AlertTitle>
+          <AlertDescription>{deviceRegAlert}</AlertDescription>
+        </Alert>
+      )}
+
+      {isClient && !isDeviceRegistered && !deviceRegAlert && (
         <Alert className="mb-6 bg-blue-500/10 border-blue-500/20 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300 dark:border-blue-900">
           <Info className="h-4 w-4" />
           <AlertTitle>Device Registration Required</AlertTitle>
@@ -465,5 +468,3 @@ export default function StudentDashboardPage() {
     </>
   );
 }
-
-    

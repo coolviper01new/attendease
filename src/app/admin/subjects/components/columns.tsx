@@ -43,10 +43,10 @@ import Image from "next/image";
 import { useState, useMemo } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { groupBy } from "lodash";
-import { useToast } from "@/hooks/use-toast";
 import { errorEmitter } from "@/firebase/error-emitter";
 import { FirestorePermissionError } from "@/firebase/errors";
 import { AttendanceScannerDialog } from "./attendance-scanner-dialog";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 
 const SessionToggle = ({ subjectId, onRefresh }: { subjectId: string, onRefresh: () => void }) => {
@@ -146,7 +146,6 @@ const EnrollmentQrCodeDialog = ({ subject }: { subject: Subject }) => {
 
 const EnrollmentStatusAction = ({ subject, onStatusChange }: { subject: Subject; onStatusChange: () => void }) => {
     const firestore = useFirestore();
-    const { toast } = useToast();
     const [isSubmitting, setIsSubmitting] = useState(false);
     
     const isEnrollmentOpen = subject.enrollmentStatus === 'open';
@@ -158,10 +157,6 @@ const EnrollmentStatusAction = ({ subject, onStatusChange }: { subject: Subject;
         const subjectData = { enrollmentStatus: newStatus };
 
         updateDoc(subjectRef, subjectData).then(() => {
-            toast({
-                title: `Enrollment ${newStatus === 'open' ? 'Started' : 'Closed'}`,
-                description: `Students can ${newStatus === 'open' ? 'now enroll in' : 'no longer enroll in'} ${subject.name} (${subject.block}).`,
-            });
             onStatusChange();
         }).catch(error => {
             errorEmitter.emit('permission-error', new FirestorePermissionError({
@@ -221,18 +216,18 @@ const EnrollmentStatusAction = ({ subject, onStatusChange }: { subject: Subject;
 
 const DeleteSubjectAction = ({ subject, onDeleted }: { subject: Subject; onDeleted: () => void }) => {
     const firestore = useFirestore();
-    const { toast } = useToast();
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [alertInfo, setAlertInfo] = useState<{title: string, description: string} | null>(null);
 
     const handleDelete = async () => {
         setIsSubmitting(true);
+        setAlertInfo(null);
         try {
             const registrationsQuery = query(collectionGroup(firestore, 'registrations'), where('subjectId', '==', subject.id));
             const registrationsSnapshot = await getDocs(registrationsQuery);
 
             if (!registrationsSnapshot.empty) {
-                toast({
-                    variant: 'destructive',
+                setAlertInfo({
                     title: 'Deletion Failed',
                     description: `Cannot delete ${subject.name} (${subject.block}). At least one student is enrolled.`,
                 });
@@ -243,10 +238,6 @@ const DeleteSubjectAction = ({ subject, onDeleted }: { subject: Subject; onDelet
             const subjectRef = doc(firestore, 'subjects', subject.id);
             await deleteDoc(subjectRef);
             
-            toast({
-                title: 'Subject Deleted',
-                description: `${subject.name} (${subject.block}) has been deleted.`,
-            });
             onDeleted();
 
         } catch (error) {
@@ -276,6 +267,12 @@ const DeleteSubjectAction = ({ subject, onDeleted }: { subject: Subject; onDelet
                         This will permanently delete the subject <span className="font-bold">{subject.name} ({subject.block})</span>. This action cannot be undone and will only succeed if no students are enrolled.
                     </AlertDialogDescription>
                 </AlertDialogHeader>
+                {alertInfo && (
+                    <Alert variant="destructive">
+                        <AlertTitle>{alertInfo.title}</AlertTitle>
+                        <AlertDescription>{alertInfo.description}</AlertDescription>
+                    </Alert>
+                )}
                 <AlertDialogFooter>
                     <AlertDialogCancel>Cancel</AlertDialogCancel>
                     <AlertDialogAction className="bg-destructive hover:bg-destructive/90 text-destructive-foreground" onClick={handleDelete} disabled={isSubmitting}>
@@ -449,5 +446,3 @@ export const getColumns = ({ onEdit, onRefresh }: GetColumnsProps): ColumnDef<Su
     cell: (props) => <ActionsCell {...props} onEdit={onEdit} onRefresh={onRefresh} />,
   },
 ];
-
-    

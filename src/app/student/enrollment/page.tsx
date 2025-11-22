@@ -19,30 +19,31 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { useToast } from '@/hooks/use-toast';
 import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, addDoc, serverTimestamp, query, where, doc } from 'firebase/firestore';
 import type { Subject, Registration } from '@/lib/types';
 import { groupBy } from 'lodash';
 import { Skeleton } from '@/components/ui/skeleton';
-import { BookOpen, Clock } from 'lucide-react';
+import { BookOpen, Clock, AlertTriangle } from 'lucide-react';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 function SubjectEnrollmentCard({ 
     subjectCode, 
     subjects, 
     userRegistrations, 
-    isLoading 
+    isLoading,
+    onEnrollmentChange
 }: { 
     subjectCode: string;
     subjects: Subject[];
     userRegistrations: Registration[] | null;
     isLoading: boolean;
+    onEnrollmentChange: (status: 'success' | 'error', message: string, description?: string) => void;
 }) {
     const { user } = useUser();
     const firestore = useFirestore();
-    const { toast } = useToast();
     
     const [selectedBlock, setSelectedBlock] = useState<string | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -52,19 +53,19 @@ function SubjectEnrollmentCard({
 
     const handleEnroll = async () => {
         if (!user || !selectedBlock) {
-            toast({ variant: 'destructive', title: 'Selection Incomplete', description: 'Please select a block.' });
+            onEnrollmentChange('error', 'Selection Incomplete', 'Please select a block.');
             return;
         }
 
         const subjectToEnroll = subjects.find(s => s.block === selectedBlock);
         if (!subjectToEnroll) {
-            toast({ variant: 'destructive', title: 'Error', description: 'Selected subject block not found.' });
+            onEnrollmentChange('error', 'Error', 'Selected subject block not found.');
             return;
         }
         
         const isAlreadyRegistered = userRegistrations?.some(reg => reg.subjectId === subjectToEnroll.id);
         if (isAlreadyRegistered) {
-            toast({ variant: 'destructive', title: 'Already Registered', description: `You are already enrolled in this subject.` });
+            onEnrollmentChange('error', 'Already Registered', `You are already enrolled in this subject.`);
             return;
         }
 
@@ -78,10 +79,7 @@ function SubjectEnrollmentCard({
         const registrationRef = collection(firestore, 'users', user.uid, 'registrations');
         
         addDoc(registrationRef, registrationData).then(() => {
-            toast({
-                title: 'Enrollment Successful',
-                description: `You have been enrolled in ${subjectToEnroll.name} (${selectedBlock}).`,
-            });
+            onEnrollmentChange('success', 'Enrollment Successful', `You have been enrolled in ${subjectToEnroll.name} (${selectedBlock}).`);
             setSelectedBlock(null);
         }).catch(error => {
             const newDocId = "new_registration_id";
@@ -94,6 +92,7 @@ function SubjectEnrollmentCard({
                     requestResourceData: registrationData
                 })
             );
+            onEnrollmentChange('error', 'Enrollment Failed', 'Could not process your enrollment. Please try again.');
         }).finally(() => {
             setIsSubmitting(false);
         });
@@ -157,6 +156,7 @@ function SubjectEnrollmentCard({
 export default function EnrollmentPage() {
   const { user, isUserLoading } = useUser();
   const firestore = useFirestore();
+  const [alert, setAlert] = useState<{status: 'success' | 'error', title: string, description?: string} | null>(null);
 
   const subjectsQuery = useMemoFirebase(() => query(collection(firestore, 'subjects'), where('enrollmentStatus', '==', 'open')), [firestore]);
   const { data: allSubjects, isLoading: areSubjectsLoading } = useCollection<Subject>(subjectsQuery);
@@ -165,13 +165,21 @@ export default function EnrollmentPage() {
     if (!user) return null;
     return query(collection(firestore, 'users', user.uid, 'registrations'));
   }, [firestore, user]);
-  const { data: userRegistrations, isLoading: areRegsLoading } = useCollection<Registration>(registrationsQuery);
+  const { data: userRegistrations, isLoading: areRegsLoading, forceRefresh } = useCollection<Registration>(registrationsQuery);
 
   const groupedSubjects = useMemo(() => {
     if (!allSubjects) return {};
     return groupBy(allSubjects, 'code');
   }, [allSubjects]);
   
+  const handleEnrollmentChange = (status: 'success' | 'error', title: string, description?: string) => {
+    setAlert({status, title, description});
+    if(status === 'success') {
+      forceRefresh();
+    }
+    setTimeout(() => setAlert(null), 5000);
+  }
+
   const availableSubjectCodes = Object.keys(groupedSubjects);
   const isLoading = isUserLoading || areSubjectsLoading || areRegsLoading;
 
@@ -182,6 +190,14 @@ export default function EnrollmentPage() {
         description="Browse available subjects for the current semester and enroll."
       />
       
+      {alert && (
+        <Alert variant={alert.status === 'error' ? 'destructive' : 'default'} className="mb-6">
+          {alert.status === 'error' && <AlertTriangle className="h-4 w-4" />}
+          <AlertTitle>{alert.title}</AlertTitle>
+          {alert.description && <AlertDescription>{alert.description}</AlertDescription>}
+        </Alert>
+      )}
+
       {isLoading ? (
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {[...Array(3)].map((_, i) => (
@@ -210,6 +226,7 @@ export default function EnrollmentPage() {
               subjects={groupedSubjects[code]}
               userRegistrations={userRegistrations}
               isLoading={isLoading}
+              onEnrollmentChange={handleEnrollmentChange}
             />
           ))}
         </div>
@@ -223,5 +240,3 @@ export default function EnrollmentPage() {
     </>
   );
 }
-
-    
