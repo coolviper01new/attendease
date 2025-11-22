@@ -93,13 +93,16 @@ const ScheduleArray = ({ control, setValue, getValues, name, label, description 
       
       let sourceSchedule = null;
 
-      // Search backwards from the target day to find the most recent checked day with a schedule
+      // Search backwards from the target day to find the most recent checked day with a complete schedule
       for (let i = targetDayOrder - 1; i >= 0; i--) {
         const prevDay = daysOfWeek[i];
+        // Find the schedule in the form values that corresponds to the previous day
         const foundSchedule = allFormSchedules.find(f => f.day === prevDay);
-        if (foundSchedule) {
+
+        // Check if the found schedule has all necessary fields filled
+        if (foundSchedule && foundSchedule.startTime && foundSchedule.endTime && foundSchedule.room) {
             sourceSchedule = foundSchedule;
-            break;
+            break; // Found a valid source, so stop looking
         }
       }
 
@@ -122,7 +125,7 @@ const ScheduleArray = ({ control, setValue, getValues, name, label, description 
           setAlert({
               variant: 'destructive',
               title: 'Cannot Copy',
-              description: 'There is no previous checked day to copy from.',
+              description: 'There is no previous day with a complete schedule to copy from.',
           });
       }
       setTimeout(() => setAlert(null), 3000);
