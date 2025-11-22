@@ -227,14 +227,14 @@ service cloud.firestore {
        * @path /subjects/{subjectId}/attendanceSessions/{attendanceSessionId}/attendance/{attendanceId}
        * @allow (create) A signed-in student can create their own attendance record.
        * @allow (get) A student can read their own attendance record. An admin can read any record.
-       * @allow (list) An admin can list all attendance records in a session.
+       * @allow (list) An admin can list all records. A student can only list their own record.
        * @deny (list) A student cannot list all attendance records in a session to protect privacy.
        * @deny (update) A student cannot modify their attendance record once submitted.
        * @principle Enforces document ownership for writes and reads, and prevents data enumeration.
        */
       match /attendance/{attendanceId} {
         allow get: if isOwner(resource.data.studentId) || isAdmin();
-        allow list: if isAdmin();
+        allow list: if isAdmin() || (isSignedIn() && request.query.where.studentId == request.auth.uid);
         allow create: if isSignedIn() && request.resource.data.studentId == request.auth.uid;
         allow update: if false;
         allow delete: if isAdmin() && isExistingDoc();
