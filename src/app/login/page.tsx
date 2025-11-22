@@ -15,9 +15,9 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { AppWindow } from 'lucide-react';
-import { useAuth, useUser, useFirestore } from '@/firebase';
+import { useAuth, useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { signInWithEmailAndPassword } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 
 export default function LoginPage() {
@@ -31,6 +31,13 @@ export default function LoginPage() {
   const { user, isUserLoading } = useUser();
   const { toast } = useToast();
 
+  const userDocRef = useMemoFirebase(() => {
+      if (!user) return null;
+      return doc(firestore, 'users', user.uid);
+  }, [user, firestore]);
+  const { data: userData, isLoading: isUserDocLoading } = useDoc(userDocRef);
+
+
   const handleSignIn = async () => {
     if (!email || !password) {
       toast({
@@ -43,7 +50,7 @@ export default function LoginPage() {
     setIsSubmitting(true);
     try {
       await signInWithEmailAndPassword(auth, email, password);
-      // onAuthStateChanged will handle the redirect
+      // onAuthStateChanged + useEffect below will handle the redirect
     } catch (error: any) {
       console.error(error);
        toast({
@@ -51,36 +58,29 @@ export default function LoginPage() {
         title: "Sign in failed",
         description: "Invalid email or password. Please try again.",
       });
-    } finally {
-        setIsSubmitting(false);
+       setIsSubmitting(false);
     }
   };
 
   useEffect(() => {
-    if (!isUserLoading && user && firestore) {
-      const userDocRef = doc(firestore, 'users', user.uid);
-      getDoc(userDocRef).then(docSnap => {
-        if(docSnap.exists()) {
-            const userData = docSnap.data();
-            if (userData.role === 'admin') {
-                router.push('/admin/dashboard');
-            } else {
-                router.push('/student/dashboard');
-            }
-        } else {
-            // This case might happen if the user doc creation failed after auth creation
-            // Or if user is not in 'users' collection for some reason.
-            console.error("User document not found in Firestore.");
-             toast({
-                variant: "destructive",
-                title: "Login Error",
-                description: "Could not find user profile. Please contact support.",
-            });
-            auth.signOut(); // Sign out the user
-        }
-      });
+    const isLoading = isUserLoading || isUserDocLoading;
+    if (!isLoading && user && userData) {
+      if (userData.role === 'admin') {
+          router.push('/admin/dashboard');
+      } else {
+          router.push('/student/dashboard');
+      }
     }
-  }, [user, isUserLoading, router, firestore, auth, toast]);
+  }, [user, userData, isUserLoading, isUserDocLoading, router]);
+
+  // If user is already logged in and we know their role, redirect them.
+  if (!isUserLoading && !isUserDocLoading && user && userData) {
+      return (
+        <div className="flex items-center justify-center min-h-screen">
+          <p>You are already logged in. Redirecting...</p>
+        </div>
+      );
+  }
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-background">
@@ -127,8 +127,8 @@ export default function LoginPage() {
           </div>
         </CardContent>
         <CardFooter className="flex flex-col gap-4">
-          <Button className="w-full" onClick={handleSignIn} disabled={isSubmitting || isUserLoading}>
-            {isSubmitting || isUserLoading ? 'Signing in...' : 'Sign In'}
+          <Button className="w-full" onClick={handleSignIn} disabled={isSubmitting || isUserLoading || isUserDocLoading}>
+            {isSubmitting || isUserLoading || isUserDocLoading ? 'Signing in...' : 'Sign In'}
           </Button>
           <div className="text-sm text-center text-muted-foreground">
             Don&apos;t have an account?{' '}
