@@ -3,7 +3,7 @@ import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 import { Inter, Space_Grotesk as SpaceGrotesk } from 'next/font/google';
 import { cn } from '@/lib/utils';
-import { FirebaseClientProvider } from '@/firebase';
+import { Providers } from './providers';
 
 const fontBody = Inter({
   subsets: ['latin'],
@@ -28,10 +28,10 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark" style={{colorScheme: 'dark'}} suppressHydrationWarning>
       <body className={cn(fontBody.variable, fontHeadline.variable, "font-body antialiased")}>
-        <FirebaseClientProvider>
+        <Providers>
           {children}
-        </FirebaseClientProvider>
-        <Toaster />
+          <Toaster />
+        </Providers>
       </body>
     </html>
   );

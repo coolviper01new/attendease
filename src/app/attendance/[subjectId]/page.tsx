@@ -1,4 +1,4 @@
-import { getFirestore, doc, getDoc } from 'firebase/admin/firestore';
+import { getFirestore, doc, getDoc } from 'firebase-admin/firestore';
 import { adminApp } from '@/firebase/admin';
 import { notFound } from 'next/navigation';
 import type { Subject } from '@/lib/types';
@@ -7,6 +7,7 @@ import { AttendanceClient } from './components/attendance-client';
 // This is a server-side component to fetch initial data
 async function getSubject(subjectId: string): Promise<Subject | null> {
   try {
+    // IMPORTANT: Using adminApp() directly here for server-side data fetching
     const firestore = getFirestore(adminApp());
     const subjectDocRef = doc(firestore, 'subjects', subjectId);
     const subjectSnapshot = await getDoc(subjectDocRef);
