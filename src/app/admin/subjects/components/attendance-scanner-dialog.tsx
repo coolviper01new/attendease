@@ -297,7 +297,7 @@ export function AttendanceScannerDialog({
         return;
       }
       
-      // Removed the redundant registration check. The AI will validate the secret.
+      // The AI will validate the secret.
       const validationInput = {
         qrCodeData: scannedData,
         qrCodeSecret: activeSession.qrCodeSecret,
@@ -418,9 +418,9 @@ export function AttendanceScannerDialog({
         <DialogHeader className="text-center">
           <DialogTitle className="text-3xl font-bold font-headline">Attendance Scanner</DialogTitle>
           <DialogDescription className="text-lg text-muted-foreground">{subject.name} ({subject.code})</DialogDescription>
-           <Alert className="mt-4 bg-primary/5 border-primary/20">
-              <AlertTitle className="font-semibold text-primary">Welcome Student!</AlertTitle>
-              <AlertDescription className="text-foreground/80">
+           <Alert className="mt-4 bg-primary/5 border-primary/20 text-center">
+              <AlertTitle className="font-semibold text-primary text-2xl">Welcome Student!</AlertTitle>
+              <AlertDescription className="text-foreground/80 text-lg">
                 Please show your Subject QR Code Generated at least 1 foot to the device camera. Thank you
               </AlertDescription>
             </Alert>
