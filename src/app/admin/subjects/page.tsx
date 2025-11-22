@@ -9,7 +9,7 @@ import { PlusCircle } from "lucide-react";
 import { SubjectClient } from "./components/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
-import { collection, doc, getDocs, query } from 'firebase/firestore';
+import { collection, doc, getDocs, query, where } from 'firebase/firestore';
 import type { Subject } from "@/lib/types";
 import {
   Dialog,
@@ -26,7 +26,7 @@ export default function AdminSubjectsPage() {
   
   const firestore = useFirestore();
   
-  const subjectsQuery = useMemoFirebase(() => collection(firestore, 'subjects'), [firestore]);
+  const subjectsQuery = useMemoFirebase(() => query(collection(firestore, 'subjects'), where('deleted', '!=', true)), [firestore]);
   const { data: subjects, isLoading, forceRefresh } = useCollection<Subject>(subjectsQuery);
 
   const handleAddNew = () => {
