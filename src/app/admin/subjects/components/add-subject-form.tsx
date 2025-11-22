@@ -92,7 +92,7 @@ const ScheduleArray = ({ control, name, label, description }: { control: any, na
       
       let sourceSchedule = null;
 
-      // Search backwards from the target day to find the most recent checked day
+      // Search backwards from the target day to find the most recent checked day with a schedule
       for (let i = targetDayOrder - 1; i >= 0; i--) {
         const prevDay = daysOfWeek[i];
         const foundSchedule = allFormSchedules.find(f => f.day === prevDay);
