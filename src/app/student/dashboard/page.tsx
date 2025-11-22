@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -115,7 +114,7 @@ const SubjectCard = ({ subject, student, isClient, isDeviceRegistered, isCurrent
     student: Student | null;
     isClient: boolean;
     isDeviceRegistered: boolean;
-    isCurrentDevice: boolean;
+isCurrentDevice: boolean;
     onRegisterDevice: () => void;
     isToday?: boolean;
 }) => {
@@ -127,16 +126,15 @@ const SubjectCard = ({ subject, student, isClient, isDeviceRegistered, isCurrent
     const { data: activeSessions } = useCollection<AttendanceSession>(activeSessionQuery);
     const activeSession = activeSessions?.[0];
 
-    const sessionAttendanceQuery = useMemoFirebase(() => {
-      if (!activeSession || !student) return null;
-      return query(
-        collection(firestore, `subjects/${subject.id}/attendanceSessions/${activeSession.id}/attendance`),
-        where('studentId', '==', student.id)
-      );
+    const studentAttendanceDocRef = useMemoFirebase(() => {
+        if (!activeSession || !student) return null;
+        // Assume the attendance document ID is the student's ID for a direct lookup
+        return doc(firestore, `subjects/${subject.id}/attendanceSessions/${activeSession.id}/attendance`, student.id);
     }, [firestore, subject.id, activeSession, student]);
-    const { data: attendanceRecords } = useCollection<Attendance>(sessionAttendanceQuery);
 
-    const isPresent = !!(attendanceRecords && attendanceRecords.length > 0);
+    const { data: attendanceRecord } = useDoc<Attendance>(studentAttendanceDocRef);
+
+    const isPresent = !!attendanceRecord;
 
     const getTodaySchedules = (schedules: Schedule[] = [], day: string) => {
         return schedules.filter(sc => sc.day === day);
@@ -412,5 +410,3 @@ export default function StudentDashboardPage() {
     </>
   );
 }
-
-    

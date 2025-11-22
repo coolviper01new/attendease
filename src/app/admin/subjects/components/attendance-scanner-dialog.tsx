@@ -38,7 +38,7 @@ import {
   updateDoc,
   serverTimestamp,
   getDoc,
-  collectionGroup,
+  setDoc,
 } from 'firebase/firestore';
 import { validateAttendance } from '@/ai/flows/attendance-validator';
 import type {
@@ -238,10 +238,7 @@ export function AttendanceScannerDialog({
         });
         return;
       }
-
-      // The check for student registration is removed from here.
-      // We now trust the QR code's integrity.
-
+      
       const validationInput = {
         qrCodeData: scannedData,
         qrCodeSecret: activeSession.qrCodeSecret,
@@ -254,7 +251,9 @@ export function AttendanceScannerDialog({
         const studentDoc = await getDoc(doc(firestore, 'users', qrData.studentId));
         const studentData = studentDoc.data() as Student | undefined;
 
-        await addDoc(collection(firestore, sessionAttendanceQuery.path), {
+        // Use setDoc with studentId as the document ID for idempotent writes
+        const attendanceDocRef = doc(firestore, sessionAttendanceQuery.path, qrData.studentId);
+        await setDoc(attendanceDocRef, {
           studentId: qrData.studentId,
           subjectId: subject.id,
           timestamp: serverTimestamp(),
@@ -356,7 +355,7 @@ export function AttendanceScannerDialog({
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => {
-        if (!isOpen) {
+        if (!isOpen && activeSession) { // Check if session is active before stopping
             handleStopSession(); // Ensure session is stopped when dialog is closed
         }
         onOpenChange(isOpen);
