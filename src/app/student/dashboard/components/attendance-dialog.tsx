@@ -20,7 +20,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, query, where, orderBy } from 'firebase/firestore';
+import { collectionGroup, query, where, orderBy } from 'firebase/firestore';
 import type { Subject, Student, Attendance } from '@/lib/types';
 import { ListChecks } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -43,10 +43,10 @@ export function AttendanceDialog({
   const attendanceQuery = useMemoFirebase(() => {
     if (!student) return null;
     return query(
-      collection(firestore, 'attendance'),
+      collectionGroup(firestore, 'attendance'),
       where('studentId', '==', student.id),
       where('subjectId', '==', subject.id),
-      orderBy('date', 'desc')
+      orderBy('timestamp', 'desc')
     );
   }, [firestore, student, subject]);
 
@@ -136,5 +136,3 @@ export function AttendanceDialog({
     </Dialog>
   );
 }
-
-    
