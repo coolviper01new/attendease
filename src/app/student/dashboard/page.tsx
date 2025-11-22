@@ -112,7 +112,7 @@ export default function StudentDashboardPage() {
       if (!user) return null;
       return doc(firestore, 'users', user.uid);
   }, [user, firestore]);
-  const { data: student, isLoading: isStudentLoading, forceRefresh: refreshStudent } = useDoc<Student>(userDocRef);
+  const { data: student, isLoading: isStudentLoading } = useDoc<Student>(userDocRef);
   
   const registrationsQuery = useMemoFirebase(() => {
     if (!user) return null;
@@ -174,7 +174,6 @@ export default function StudentDashboardPage() {
             title: "Device Registered",
             description: "This device has been successfully registered for QR code generation.",
         });
-        refreshStudent();
     } catch (error) {
         console.error("Device registration error:", error);
         toast({
