@@ -1,6 +1,7 @@
 
 
 
+
 export type SchoolYear = {
   id: string;
   name: string;
@@ -40,13 +41,14 @@ export type Subject = {
   name: string;
   code: string;
   description: string;
-  schedules: Schedule[];
+  credits: number;
+  hasLab: boolean;
+  lectureSchedules: Schedule[];
+  labSchedules?: Schedule[];
   block: string;
   schoolYear: string;
   yearLevel: string;
   enrollmentStatus: 'closed' | 'open';
-  schoolYearName?: string; // This might be deprecated if we are directly entering school year
-  yearLevelName?: string; // This might be deprecated if we are directly entering year level
 };
 
 export type Registration = {

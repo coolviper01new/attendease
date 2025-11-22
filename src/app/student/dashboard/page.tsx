@@ -106,6 +106,7 @@ export default function StudentDashboardPage() {
   const [currentDeviceId, setCurrentDeviceId] = useState<string | null>(null);
   const [isClient, setIsClient] = useState(false);
   const [enrolledSubjects, setEnrolledSubjects] = useState<Subject[]>([]);
+  const [areSubjectsLoading, setAreSubjectsLoading] = useState(true);
 
   const userDocRef = useMemoFirebase(() => {
       if (!user) return null;
@@ -128,23 +129,40 @@ export default function StudentDashboardPage() {
   
    useEffect(() => {
     const fetchEnrolledSubjects = async () => {
+      setAreSubjectsLoading(true);
       if (userRegistrations && userRegistrations.length > 0) {
         const subjectIds = userRegistrations.map(reg => reg.subjectId);
         if (subjectIds.length === 0) {
             setEnrolledSubjects([]);
+            setAreSubjectsLoading(false);
             return;
         }
-        const subjectsQuery = query(collection(firestore, 'subjects'), where('__name__', 'in', subjectIds));
-        const subjectsSnapshot = await getDocs(subjectsQuery);
-        const subjectsData = subjectsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Subject));
+        
+        const subjectChunks: string[][] = [];
+        for (let i = 0; i < subjectIds.length; i += 10) {
+            subjectChunks.push(subjectIds.slice(i, i + 10));
+        }
+
+        const subjectPromises = subjectChunks.map(chunk => 
+            getDocs(query(collection(firestore, 'subjects'), where('__name__', 'in', chunk)))
+        );
+
+        const subjectSnapshots = await Promise.all(subjectPromises);
+        const subjectsData = subjectSnapshots.flatMap(snapshot => 
+            snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Subject))
+        );
+
         setEnrolledSubjects(subjectsData);
       } else {
         setEnrolledSubjects([]);
       }
+      setAreSubjectsLoading(false);
     };
 
-    fetchEnrolledSubjects();
-  }, [userRegistrations, firestore]);
+    if(!areRegsLoading){
+        fetchEnrolledSubjects();
+    }
+  }, [userRegistrations, areRegsLoading, firestore]);
 
 
   const handleRegisterDevice = async () => {
@@ -169,7 +187,7 @@ export default function StudentDashboardPage() {
 
   const isDeviceRegistered = !!student?.deviceId;
   const isCurrentDevice = isDeviceRegistered && student?.deviceId === currentDeviceId;
-  const isLoading = isUserLoading || isStudentLoading || areRegsLoading;
+  const isLoading = isUserLoading || isStudentLoading || areRegsLoading || areSubjectsLoading;
   
   if (isLoading) {
     return (
@@ -233,12 +251,20 @@ export default function StudentDashboardPage() {
                 </div>
               </div>
             </CardHeader>
-            <CardContent className="flex-grow">
-               {subject.schedules.map((schedule, index) => (
-                <div key={index} className="flex items-center text-sm text-muted-foreground mt-1">
+            <CardContent className="flex-grow space-y-2">
+               {subject.lectureSchedules.map((schedule, index) => (
+                <div key={`lec-${index}`} className="flex items-center text-sm text-muted-foreground">
                   <Clock className="mr-2 h-4 w-4 flex-shrink-0" />
                   <span className="truncate">
-                    {schedule.day}, {schedule.startTime} - {schedule.endTime} @ {schedule.room}
+                    Lec: {schedule.day}, {schedule.startTime} - {schedule.endTime} @ {schedule.room}
+                  </span>
+                </div>
+              ))}
+              {subject.hasLab && subject.labSchedules?.map((schedule, index) => (
+                <div key={`lab-${index}`} className="flex items-center text-sm text-muted-foreground">
+                  <Clock className="mr-2 h-4 w-4 flex-shrink-0" />
+                  <span className="truncate">
+                    Lab: {schedule.day}, {schedule.startTime} - {schedule.endTime} @ {schedule.room}
                   </span>
                 </div>
               ))}
@@ -257,7 +283,7 @@ export default function StudentDashboardPage() {
           </Card>
         ))}
       </div>
-       {enrolledSubjects.length === 0 && (
+       {!isLoading && enrolledSubjects.length === 0 && (
           <Card className="mt-6">
               <CardContent className="pt-6">
                   <p className="text-center text-muted-foreground">You are not enrolled in any subjects. Go to the Enrollment page to get started.</p>

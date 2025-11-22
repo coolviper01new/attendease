@@ -157,9 +157,31 @@
           "type": "string",
           "description": "Description of the subject."
         },
-        "schedules": {
+        "credits": {
+            "type": "number",
+            "description": "Number of credit units for the subject."
+        },
+        "hasLab": {
+            "type": "boolean",
+            "description": "Indicates if the subject has a laboratory component."
+        },
+        "lectureSchedules": {
           "type": "array",
-          "description": "An array of schedule objects for the subject.",
+          "description": "An array of schedule objects for the subject's lecture.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "day": { "type": "string" },
+              "startTime": { "type": "string" },
+              "endTime": { "type": "string" },
+              "room": { "type": "string" }
+            },
+            "required": ["day", "startTime", "endTime", "room"]
+          }
+        },
+        "labSchedules": {
+          "type": "array",
+          "description": "An array of schedule objects for the subject's laboratory component.",
           "items": {
             "type": "object",
             "properties": {
@@ -193,7 +215,9 @@
         "id",
         "name",
         "code",
-        "schedules",
+        "credits",
+        "hasLab",
+        "lectureSchedules",
         "schoolYear",
         "yearLevel",
         "block",

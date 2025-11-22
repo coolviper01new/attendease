@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useForm, useFieldArray } from 'react-hook-form';
+import { useForm, useFieldArray, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
@@ -27,8 +27,10 @@ import { useFirestore } from '@/firebase';
 import { addDoc, collection, doc, setDoc, writeBatch, query, where, getDocs, deleteDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Copy } from 'lucide-react';
+import { Copy, PlusCircle, Trash2 } from 'lucide-react';
 import type { Subject, Registration } from '@/lib/types';
+import { Separator } from '@/components/ui/separator';
+import { Switch } from '@/components/ui/switch';
 
 const schoolYearRegex = /^\d{4}-\d{4}$/;
 
@@ -46,19 +48,172 @@ const subjectSchema = z.object({
   schoolYear: z.string().regex(schoolYearRegex, { message: 'Invalid format. Use YYYY-YYYY.' }),
   yearLevel: z.string({ required_error: 'Please select a year level.' }),
   blockCount: z.coerce.number().min(1, { message: 'At least one block is required.' }),
-  schedules: z.array(scheduleSchema).min(1, { message: 'At least one schedule is required.' }),
+  credits: z.coerce.number().min(1, { message: 'Credit units are required.'}),
+  hasLab: z.boolean(),
+  lectureSchedules: z.array(scheduleSchema).min(1, { message: 'At least one lecture schedule is required.' }),
+  labSchedules: z.array(scheduleSchema).optional(),
   enrollmentStatus: z.enum(['closed', 'open']),
+}).refine(data => {
+    if (data.hasLab) {
+        return data.labSchedules && data.labSchedules.length > 0;
+    }
+    return true;
+}, {
+    message: "At least one laboratory schedule is required when 'Has Lab' is enabled.",
+    path: ['labSchedules']
 });
 
 type SubjectFormValues = z.infer<typeof subjectSchema>;
 
-const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 interface AddSubjectFormProps {
   onSuccess: () => void;
   subject?: Subject | null;
   allSubjects: Subject[];
 }
+
+const ScheduleArray = ({ control, name, label, description, isLab = false }: { control: any, name: "lectureSchedules" | "labSchedules", label: string, description: string, isLab?: boolean }) => {
+    const { fields, append, remove, update } = useFieldArray({ control, name });
+
+    const handleDayCheckedChange = (checked: boolean, day: string) => {
+        const fieldIndex = fields.findIndex(field => field.day === day);
+        if (checked && fieldIndex === -1) {
+          append({ day, startTime: '', endTime: '', room: '' });
+        } else if (!checked && fieldIndex > -1) {
+          remove(fieldIndex);
+        }
+    };
+
+    const handleCopySchedule = (targetIndex: number) => {
+        const currentDay = fields[targetIndex].day;
+        const currentDayOrder = daysOfWeek.indexOf(currentDay);
+        
+        let sourceIndex = -1;
+        for (let i = currentDayOrder - 1; i >= 0; i--) {
+            const prevDay = daysOfWeek[i];
+            const foundIndex = fields.findIndex(field => field.day === prevDay);
+            if (foundIndex > -1) {
+                sourceIndex = foundIndex;
+                break;
+            }
+        }
+
+        if (sourceIndex === -1) {
+          toast({
+            variant: 'destructive',
+            title: 'Cannot Copy',
+            description: 'There is no previous checked day to copy from.',
+          });
+          return;
+        }
+      
+        const sourceSchedule = control.getValues(`${name}.${sourceIndex}`);
+        if (!sourceSchedule) return;
+      
+        const { startTime, endTime, room } = sourceSchedule;
+      
+        update(targetIndex, { ...fields[targetIndex], startTime, endTime, room });
+
+        toast({
+          title: 'Schedule Copied',
+          description: `Schedule from ${sourceSchedule.day} has been copied to ${currentDay}.`,
+        });
+    };
+
+    return (
+        <div className="space-y-4 rounded-md border p-4">
+          <FormLabel>{label}</FormLabel>
+          <FormDescription className="!mt-0 mb-2">{description}</FormDescription>
+          <div className="space-y-4">
+            {daysOfWeek.map((day) => {
+              const fieldIndex = fields.findIndex(f => f.day === day);
+              const isChecked = fieldIndex > -1;
+              return (
+                <div key={day}>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id={`${name}-${day}`}
+                      checked={isChecked}
+                      onCheckedChange={(checked) => handleDayCheckedChange(Boolean(checked), day)}
+                    />
+                    <label htmlFor={`${name}-${day}`} className="text-sm font-medium leading-none">
+                      {day}
+                    </label>
+                  </div>
+                  {isChecked && (
+                    <div className="grid grid-cols-[1fr_1fr_1fr_auto] gap-2 mt-2 pl-6 items-center">
+                       <FormField
+                        control={control}
+                        name={`${name}.${fieldIndex}.startTime` as const}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormControl>
+                              <Input type="time" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={control}
+                        name={`${name}.${fieldIndex}.endTime` as const}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormControl>
+                              <Input type="time" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={control}
+                        name={`${name}.${fieldIndex}.room` as const}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormControl>
+                              <Input
+                                placeholder="Room"
+                                {...field}
+                                onBlur={(e) => {
+                                  field.onBlur();
+                                  control.setValue(`${name}.${fieldIndex}.room`, e.target.value.toUpperCase());
+                                }}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                       <Button 
+                        type="button" 
+                        variant="ghost" 
+                        size="icon"
+                        onClick={() => handleCopySchedule(fieldIndex)}
+                        aria-label="Copy schedule from previous checked day"
+                      >
+                        <Copy className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+             <FormField
+                control={control}
+                name={name}
+                render={() => (
+                    <FormItem>
+                        <FormMessage />
+                    </FormItem>
+                )}
+            />
+          </div>
+        </div>
+    )
+}
+
 
 export function AddSubjectForm({ onSuccess, subject, allSubjects }: AddSubjectFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -67,21 +222,21 @@ export function AddSubjectForm({ onSuccess, subject, allSubjects }: AddSubjectFo
 
   const isEditMode = !!subject;
 
-  // In edit mode, find all related blocks to determine the count
-  const existingBlocksForCode = isEditMode ? allSubjects.filter(s => s.code === subject.code) : [];
-  const initialBlockCount = isEditMode ? existingBlocksForCode.length : 1;
   const isEnrollmentOpen = isEditMode && subject.enrollmentStatus === 'open';
 
   const form = useForm<SubjectFormValues>({
     resolver: zodResolver(subjectSchema),
     defaultValues: {
-      schedules: [],
+      lectureSchedules: [],
+      labSchedules: [],
       schoolYear: '',
       yearLevel: '',
       name: '',
       code: '',
       description: '',
       blockCount: 1,
+      credits: 3,
+      hasLab: false,
       enrollmentStatus: 'closed',
     },
   });
@@ -95,113 +250,71 @@ export function AddSubjectForm({ onSuccess, subject, allSubjects }: AddSubjectFo
         description: subject.description || '',
         schoolYear: subject.schoolYear,
         yearLevel: subject.yearLevel,
-        schedules: subject.schedules,
+        credits: subject.credits || 3,
+        hasLab: subject.hasLab || false,
+        lectureSchedules: subject.lectureSchedules,
+        labSchedules: subject.labSchedules || [],
         blockCount: relatedBlocks.length,
         enrollmentStatus: subject.enrollmentStatus || 'closed',
       });
     } else {
         form.reset({
-            schedules: [],
+            lectureSchedules: [],
+            labSchedules: [],
             schoolYear: '',
             yearLevel: '',
             name: '',
             code: '',
             description: '',
             blockCount: 1,
+            credits: 3,
+            hasLab: false,
             enrollmentStatus: 'closed',
         })
     }
   }, [subject, form, isEditMode, allSubjects]);
 
-
-  const { fields, append, remove, update } = useFieldArray({
-    control: form.control,
-    name: 'schedules',
-  });
-
-  const handleDayCheckedChange = (checked: boolean, day: string) => {
-    const fieldIndex = fields.findIndex(field => field.day === day);
-    if (checked && fieldIndex === -1) {
-      append({ day, startTime: '', endTime: '', room: '' });
-    } else if (!checked && fieldIndex > -1) {
-      remove(fieldIndex);
-    }
-  };
-
-  const handleCopySchedule = (targetIndex: number) => {
-    const currentDay = fields[targetIndex].day;
-    const currentDayOrder = daysOfWeek.indexOf(currentDay);
-    
-    let sourceIndex = -1;
-    for (let i = currentDayOrder - 1; i >= 0; i--) {
-        const prevDay = daysOfWeek[i];
-        const foundIndex = fields.findIndex(field => field.day === prevDay);
-        if (foundIndex > -1) {
-            sourceIndex = foundIndex;
-            break;
-        }
-    }
-
-    if (sourceIndex === -1) {
-      toast({
-        variant: 'destructive',
-        title: 'Cannot Copy',
-        description: 'There is no previous checked day to copy from.',
-      });
-      return;
-    }
-  
-    const sourceSchedule = form.getValues(`schedules.${sourceIndex}`);
-    if (!sourceSchedule) return;
-  
-    const { startTime, endTime, room } = sourceSchedule;
-  
-    update(targetIndex, { ...fields[targetIndex], startTime, endTime, room });
-
-    toast({
-      title: 'Schedule Copied',
-      description: `Schedule from ${sourceSchedule.day} has been copied to ${currentDay}.`,
-    });
-  };
+  const hasLab = form.watch('hasLab');
 
   const onSubmit = async (values: SubjectFormValues) => {
     setIsSubmitting(true);
     try {
         const { blockCount, ...subjectData } = values;
+        if (!subjectData.hasLab) {
+            subjectData.labSchedules = []; // Ensure lab schedules are empty if hasLab is false
+        }
         const subjectsRef = collection(firestore, 'subjects');
         const batch = writeBatch(firestore);
 
         if (isEditMode && subject) {
-            // Edit mode: Sync blocks - add, update, or remove
             const relatedSubjectsQuery = query(subjectsRef, where('code', '==', subject.code));
             const snapshot = await getDocs(relatedSubjectsQuery);
             const existingSubjects = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Subject));
             const existingBlockCount = existingSubjects.length;
             
-            // Core data that can change (but not block-specific data)
             const updatedSharedData: any = {
                 name: values.name,
                 description: values.description,
                 schoolYear: values.schoolYear,
                 yearLevel: values.yearLevel,
-                schedules: values.schedules,
+                credits: values.credits,
+                hasLab: values.hasLab,
+                lectureSchedules: values.lectureSchedules,
+                labSchedules: values.labSchedules || [],
             };
 
-            // Update all existing blocks with new shared data
             existingSubjects.forEach(existingSub => {
                 batch.update(doc(subjectsRef, existingSub.id), updatedSharedData);
             });
 
             if (!isEnrollmentOpen) {
                 if (blockCount > existingBlockCount) {
-                    // Add new blocks
                     for (let i = existingBlockCount + 1; i <= blockCount; i++) {
                         const newDocRef = doc(subjectsRef);
                         const blockName = `${values.code}-B${i}`;
                         batch.set(newDocRef, { ...updatedSharedData, code: values.code, block: blockName, enrollmentStatus: 'closed' });
                     }
                 } else if (blockCount < existingBlockCount) {
-                    // Remove blocks, starting from the highest number
                     const blocksToRemove = existingSubjects.sort((a, b) => b.block.localeCompare(a.block)).slice(0, existingBlockCount - blockCount);
                     
                     let undeletableBlocks: string[] = [];
@@ -232,7 +345,6 @@ export function AddSubjectForm({ onSuccess, subject, allSubjects }: AddSubjectFo
                 description: `All blocks for ${values.name} have been updated.`,
             });
         } else {
-            // Create mode: Create all blocks from scratch
             for (let i = 1; i <= blockCount; i++) {
                 const newDocRef = doc(subjectsRef);
                 const blockName = `${values.code}-B${i}`;
@@ -260,33 +372,35 @@ export function AddSubjectForm({ onSuccess, subject, allSubjects }: AddSubjectFo
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-        <FormField
-          control={form.control}
-          name="name"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Subject Name</FormLabel>
-              <FormControl>
-                <Input placeholder="e.g., Introduction to Programming" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="code"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Subject Code</FormLabel>
-              <FormControl>
-                <Input placeholder="e.g., CS101" {...field} disabled={isEditMode} />
-              </FormControl>
-              {isEditMode && <FormDescription>Subject code cannot be changed after creation.</FormDescription>}
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+        <div className="grid grid-cols-2 gap-4">
+            <FormField
+            control={form.control}
+            name="name"
+            render={({ field }) => (
+                <FormItem>
+                <FormLabel>Subject Name</FormLabel>
+                <FormControl>
+                    <Input placeholder="e.g., Introduction to Programming" {...field} />
+                </FormControl>
+                <FormMessage />
+                </FormItem>
+            )}
+            />
+             <FormField
+                control={form.control}
+                name="code"
+                render={({ field }) => (
+                    <FormItem>
+                    <FormLabel>Subject Code</FormLabel>
+                    <FormControl>
+                        <Input placeholder="e.g., CS101" {...field} disabled={isEditMode} />
+                    </FormControl>
+                    {isEditMode && <FormDescription>Code cannot be changed after creation.</FormDescription>}
+                    <FormMessage />
+                    </FormItem>
+                )}
+                />
+        </div>
         <FormField
           control={form.control}
           name="description"
@@ -338,115 +452,83 @@ export function AddSubjectForm({ onSuccess, subject, allSubjects }: AddSubjectFo
             )}
           />
         </div>
-         <FormField
-            control={form.control}
-            name="blockCount"
-            render={({ field }) => (
-                <FormItem>
-                <FormLabel>Number of Blocks</FormLabel>
-                 <FormControl>
-                  <Input type="number" min="1" {...field} disabled={isEnrollmentOpen} />
-                </FormControl>
-                <FormDescription>
-                    {isEditMode 
-                        ? (isEnrollmentOpen ? "Number of blocks cannot be changed after enrollment has started." : "Adjust the number of blocks. New blocks will be added, and empty blocks will be removed.")
-                        : "Enter the number of blocks. The system will create separate entries like IT101-B1, IT101-B2, etc."
-                    }
-                </FormDescription>
-                <FormMessage />
-                </FormItem>
-            )}
-        />
-        
-        <div>
-          <FormLabel>Schedule</FormLabel>
-          <FormDescription className="mb-2">Select the days this subject is scheduled and fill in the details.</FormDescription>
-          <div className="space-y-4">
-            {daysOfWeek.map((day, index) => {
-              const fieldIndex = fields.findIndex(f => f.day === day);
-              const isChecked = fieldIndex > -1;
-              return (
-                <div key={day}>
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id={day}
-                      checked={isChecked}
-                      onCheckedChange={(checked) => handleDayCheckedChange(Boolean(checked), day)}
-                    />
-                    <label htmlFor={day} className="text-sm font-medium leading-none">
-                      {day}
-                    </label>
-                  </div>
-                  {isChecked && (
-                    <div className="grid grid-cols-[1fr_1fr_1fr_auto] gap-2 mt-2 pl-6 items-center">
-                      <FormField
-                        control={form.control}
-                        name={`schedules.${fieldIndex}.startTime`}
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormControl>
-                              <Input type="time" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name={`schedules.${fieldIndex}.endTime`}
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormControl>
-                              <Input type="time" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name={`schedules.${fieldIndex}.room`}
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormControl>
-                              <Input
-                                placeholder="Room"
-                                {...field}
-                                onBlur={(e) => {
-                                  field.onBlur();
-                                  form.setValue(`schedules.${fieldIndex}.room`, e.target.value.toUpperCase());
-                                }}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                       <Button 
-                        type="button" 
-                        variant="ghost" 
-                        size="icon"
-                        onClick={() => handleCopySchedule(fieldIndex)}
-                        aria-label="Copy schedule from previous checked day"
-                      >
-                        <Copy className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+        <div className="grid grid-cols-2 gap-4">
              <FormField
                 control={form.control}
-                name="schedules"
-                render={() => (
+                name="blockCount"
+                render={({ field }) => (
                     <FormItem>
-                        <FormMessage />
+                    <FormLabel>Number of Blocks</FormLabel>
+                    <FormControl>
+                    <Input type="number" min="1" {...field} disabled={isEnrollmentOpen} />
+                    </FormControl>
+                    <FormDescription>
+                        {isEditMode 
+                            ? (isEnrollmentOpen ? "Cannot change after enrollment starts." : "Adjust blocks. Empty ones removed.")
+                            : "System will create blocks like IT101-B1, etc."
+                        }
+                    </FormDescription>
+                    <FormMessage />
                     </FormItem>
                 )}
             />
-          </div>
+             <FormField
+                control={form.control}
+                name="credits"
+                render={({ field }) => (
+                    <FormItem>
+                    <FormLabel>Credit Units</FormLabel>
+                    <FormControl>
+                        <Input type="number" min="1" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                    </FormItem>
+                )}
+            />
         </div>
+        
+        <Separator />
+
+        <div className="space-y-4">
+            <ScheduleArray 
+                control={form.control}
+                name="lectureSchedules"
+                label="Lecture Schedule"
+                description="Select the days and times for lecture classes."
+            />
+            <FormField
+                control={form.control}
+                name="hasLab"
+                render={({ field }) => (
+                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                        <div className="space-y-0.5">
+                        <FormLabel className="text-base">
+                            Has Laboratory
+                        </FormLabel>
+                        <FormDescription>
+                            Enable this if the subject includes a separate lab schedule.
+                        </FormDescription>
+                        </div>
+                        <FormControl>
+                        <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                        />
+                        </FormControl>
+                    </FormItem>
+                )}
+            />
+            {hasLab && (
+                 <ScheduleArray 
+                    control={form.control}
+                    name="labSchedules"
+                    label="Laboratory Schedule"
+                    description="Select the days and times for laboratory classes."
+                    isLab
+                />
+            )}
+        </div>
+
 
         <Button type="submit" disabled={isSubmitting}>
           {isSubmitting ? (isEditMode ? 'Updating...' : 'Creating...') : (isEditMode ? 'Update Subjects' : 'Create Subjects')}

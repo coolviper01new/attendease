@@ -3,7 +3,7 @@
 import { notFound, useParams } from "next/navigation";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
-import { QrCode, StopCircle } from "lucide-react";
+import { QrCode, StopCircle, Clock } from "lucide-react";
 import {
   Card,
   CardContent,
@@ -22,7 +22,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { useDoc, useCollection, useFirestore, useMemoFirebase } from "@/firebase";
-import { doc, collection, query, where } from "firebase/firestore";
+import { doc, collection, query, where, getDocs } from "firebase/firestore";
 import type { Subject, User, Student, Registration } from "@/lib/types";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useEffect, useState } from "react";
@@ -36,7 +36,8 @@ export default function SubjectAttendancePage() {
   const { data: subject, isLoading: isSubjectLoading } = useDoc<Subject>(subjectDocRef);
 
   const registrationsQuery = useMemoFirebase(() => {
-    return query(collection(firestore, 'registrations'), where('subjectId', '==', subjectId));
+    if (!subjectId) return null;
+    return query(collectionGroup(firestore, 'registrations'), where('subjectId', '==', subjectId));
   }, [firestore, subjectId]);
   
   const { data: registrations, isLoading: areRegistrationsLoading } = useCollection<Registration>(registrationsQuery);
@@ -50,18 +51,23 @@ export default function SubjectAttendancePage() {
         setAreStudentsLoading(true);
         const studentIds = registrations.map(reg => reg.studentId);
         
-        // Firestore 'in' queries are limited to 10 items.
-        // For more, you'd need to batch requests.
-        if (studentIds.length > 0) {
-          const studentsQuery = query(collection(firestore, 'users'), where('__name__', 'in', studentIds));
-          const studentSnapshots = await getDocs(studentsQuery);
-          const students = studentSnapshots.docs.map(doc => ({ id: doc.id, ...doc.data() } as Student & {id: string}));
-          setRegisteredStudents(students);
-        } else {
-           setRegisteredStudents([]);
+        const studentChunks: string[][] = [];
+        for (let i = 0; i < studentIds.length; i += 10) {
+            studentChunks.push(studentIds.slice(i, i + 10));
         }
+        
+        const studentPromises = studentChunks.map(chunk => 
+            getDocs(query(collection(firestore, 'users'), where('__name__', 'in', chunk)))
+        );
 
+        const studentSnapshots = await Promise.all(studentPromises);
+        const students = studentSnapshots.flatMap(snapshot => 
+            snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Student & {id: string}))
+        );
+
+        setRegisteredStudents(students);
         setAreStudentsLoading(false);
+
       } else if (!areRegistrationsLoading) {
         setRegisteredStudents([]);
         setAreStudentsLoading(false);
@@ -136,7 +142,7 @@ export default function SubjectAttendancePage() {
                       <TableCell>
                         <div className="flex items-center gap-3">
                           <Avatar>
-                            <AvatarImage src={student.avatarUrl} alt={student.name} />
+                            <AvatarImage src={student.avatarUrl} />
                             <AvatarFallback>{student.name?.charAt(0)}</AvatarFallback>
                           </Avatar>
                           <div>

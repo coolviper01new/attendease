@@ -5,7 +5,7 @@
 import { ColumnDef } from "@tanstack/react-table";
 import type { Subject, AttendanceSession as TAttendanceSession } from "@/lib/types";
 import { Button } from "@/components/ui/button";
-import { ArrowUpDown, MoreHorizontal, QrCode, PlayCircle } from "lucide-react";
+import { ArrowUpDown, MoreHorizontal, QrCode, PlayCircle, Clock } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -237,18 +237,14 @@ export const getColumns = ({ onEdit, allSubjects, onRefresh }: GetColumnsProps):
       <div className="pl-4">
         <div className="font-medium">{row.original.name}</div>
         <div className="text-xs text-muted-foreground">{row.original.code}</div>
-        <div className="text-xs text-muted-foreground truncate max-w-xs">{row.original.description}</div>
+        <div className="text-xs text-muted-foreground truncate max-w-[200px]">{row.original.description}</div>
       </div>
     ),
   },
   {
-    accessorKey: "schoolYear",
-    header: "School Year",
-  },
-  {
-    accessorKey: "yearLevel",
-    header: "Year Level",
-     cell: ({ row }) => <span>{row.original.yearLevel} Year</span>
+    accessorKey: "credits",
+    header: "Credits",
+    cell: ({row}) => <div className="text-center">{row.original.credits}</div>
   },
    {
     accessorKey: "block",
@@ -256,15 +252,35 @@ export const getColumns = ({ onEdit, allSubjects, onRefresh }: GetColumnsProps):
      cell: ({ row }) => <Badge variant="outline">{row.original.block}</Badge>,
   },
   {
-      accessorKey: "schedules",
+      id: "schedules",
       header: "Schedule",
-      cell: ({row}) => (
-        <div className="text-xs flex flex-col gap-1">
-            {row.original.schedules.map(s => (
-                <span key={s.day}>{s.day}, {s.startTime}-{s.endTime} @ {s.room}</span>
-            ))}
-        </div>
-      )
+      cell: ({row}) => {
+        const { lectureSchedules, labSchedules, hasLab } = row.original;
+        return (
+            <div className="text-xs flex flex-col gap-2">
+                <div>
+                    <p className="font-semibold mb-1">Lecture</p>
+                    {lectureSchedules.map((s, i) => (
+                        <div key={`lec-${i}`} className="flex items-center gap-1 text-muted-foreground">
+                            <Clock className="w-3 h-3" />
+                            <span>{s.day}, {s.startTime}-{s.endTime} @ {s.room}</span>
+                        </div>
+                    ))}
+                </div>
+                {hasLab && labSchedules && labSchedules.length > 0 && (
+                    <div>
+                        <p className="font-semibold mt-1 mb-1">Laboratory</p>
+                        {labSchedules.map((s, i) => (
+                            <div key={`lab-${i}`} className="flex items-center gap-1 text-muted-foreground">
+                                <Clock className="w-3 h-3" />
+                                <span>{s.day}, {s.startTime}-{s.endTime} @ {s.room}</span>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+        )
+      }
   },
   {
     id: "enrollmentStatus",
