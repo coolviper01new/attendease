@@ -1,15 +1,37 @@
+
+'use client';
 import { Header } from "@/components/header";
 import { SidebarProvider, Sidebar, SidebarTrigger, SidebarContent, SidebarHeader, SidebarFooter } from "@/components/ui/sidebar";
 import { AdminSidebarNav } from "./components/admin-sidebar-nav";
 import Link from "next/link";
 import { AppWindow, Settings, LifeBuoy } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useUser } from "@/firebase";
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
 
 export default function AdminLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const { user, isUserLoading } = useUser();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!isUserLoading && !user) {
+      router.replace('/login');
+    }
+  }, [user, isUserLoading, router]);
+
+  if (isUserLoading || !user) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+          <p>Loading...</p>
+      </div>
+    );
+  }
+
   return (
     <SidebarProvider>
       <div className="container flex items-center justify-between p-4 md:hidden">
