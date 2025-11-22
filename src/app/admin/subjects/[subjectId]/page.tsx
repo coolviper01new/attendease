@@ -22,15 +22,13 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { useDoc, useCollection, useFirestore, useMemoFirebase } from "@/firebase";
-import { doc, collection, query, where, getDocs, collectionGroup, addDoc, updateDoc, serverTimestamp } from "firebase/firestore";
+import { doc, collection, query, where, getDocs, collectionGroup, addDoc, updateDoc, serverTimestamp, getDoc } from "firebase/firestore";
 import type { Subject, User, Student, Registration, AttendanceSession, Attendance } from "@/lib/types";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useEffect, useState, useRef, useMemo } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { validateAttendance } from "@/ai/flows/attendance-validator";
-
-// A library to decode QR codes from a video stream
 import QrScanner from 'qr-scanner';
 
 
@@ -45,28 +43,65 @@ export default function SubjectAttendancePage() {
   const [isProcessing, setIsProcessing] = useState(false);
   const isMounted = useRef(true);
 
-  // --- Data Fetching ---
-  const subjectDocRef = useMemoFirebase(() => doc(firestore, 'subjects', subjectId), [firestore, subjectId]);
-  const { data: subject, isLoading: isSubjectLoading } = useDoc<Subject>(subjectDocRef);
+  // --- Unified Data State ---
+  const [isLoading, setIsLoading] = useState(true);
+  const [subject, setSubject] = useState<Subject | null>(null);
+  const [presentStudents, setPresentStudents] = useState<(Student & {id: string})[]>([]);
 
+  // --- Data Fetching Hooks ---
   const activeSessionQuery = useMemoFirebase(() => 
-    query(collection(firestore, 'subjects', subjectId, 'attendanceSessions'), where('isActive', '==', true))
+    subjectId ? query(collection(firestore, 'subjects', subjectId, 'attendanceSessions'), where('isActive', '==', true)) : null
   , [firestore, subjectId]);
-  const { data: activeSessions, isLoading: isSessionLoading } = useCollection<AttendanceSession>(activeSessionQuery);
+  const { data: activeSessions } = useCollection<AttendanceSession>(activeSessionQuery);
   const activeSession = activeSessions?.[0];
-
+  
   const sessionAttendanceQuery = useMemoFirebase(() => {
     if (!activeSession) return null;
     return collection(firestore, `subjects/${subjectId}/attendanceSessions/${activeSession.id}/attendance`);
   }, [firestore, subjectId, activeSession]);
-  const { data: attendanceRecords, isLoading: isAttendanceLoading } = useCollection<Attendance>(sessionAttendanceQuery);
+  const { data: attendanceRecords } = useCollection<Attendance>(sessionAttendanceQuery);
   
-  const [presentStudents, setPresentStudents] = useState<(Student & {id: string})[]>([]);
+  // --- Main Data Fetching and Student Details Effect ---
+  useEffect(() => {
+    isMounted.current = true;
+    
+    const fetchAllData = async () => {
+      if (!subjectId || !isMounted.current) return;
 
+      setIsLoading(true);
+
+      // 1. Fetch Subject
+      const subjectDocRef = doc(firestore, 'subjects', subjectId);
+      const subjectSnapshot = await getDoc(subjectDocRef);
+      if (!isMounted.current) return;
+
+      if (!subjectSnapshot.exists()) {
+        setSubject(null);
+        setIsLoading(false);
+        return;
+      }
+      const subjectData = { id: subjectSnapshot.id, ...subjectSnapshot.data() } as Subject;
+      setSubject(subjectData);
+    };
+
+    fetchAllData();
+
+    return () => {
+      isMounted.current = false;
+    }
+  }, [subjectId, firestore]);
+  
+  // Effect to fetch student details for those present
   useEffect(() => {
       isMounted.current = true;
       const fetchStudentDetails = async () => {
-          if (attendanceRecords && attendanceRecords.length > 0) {
+          if (attendanceRecords) {
+            if (attendanceRecords.length === 0) {
+              if (isMounted.current) setPresentStudents([]);
+              setIsLoading(false); // Stop loading if subject is loaded but no one is present
+              return;
+            }
+
               const studentIds = attendanceRecords.map(att => att.studentId);
               if (studentIds.length === 0) {
                 if (isMounted.current) setPresentStudents([]);
@@ -91,15 +126,19 @@ export default function SubjectAttendancePage() {
           } else {
               if (isMounted.current) setPresentStudents([]);
           }
+           // This now only turns off loading after student data attempt
+          if(subject) setIsLoading(false);
       };
 
-      fetchStudentDetails();
+      if (subject) { // Only run this if we have a subject
+        fetchStudentDetails();
+      }
 
       return () => {
         isMounted.current = false;
       }
-  }, [attendanceRecords, firestore]);
-  
+  }, [attendanceRecords, firestore, subject]);
+
 
   // --- Camera and QR Scanner Effects ---
   useEffect(() => {
@@ -249,8 +288,6 @@ export default function SubjectAttendancePage() {
     toast({ title: "Attendance Session Stopped" });
   };
 
-  const isLoading = isSubjectLoading || isSessionLoading;
-
   if (isLoading) {
     return (
         <div className="p-6">
@@ -260,7 +297,8 @@ export default function SubjectAttendancePage() {
         </div>
     )
   }
-
+  
+  // This now only runs after loading is complete
   if (!subject) {
     notFound();
   }
@@ -330,7 +368,7 @@ export default function SubjectAttendancePage() {
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="p-4 pt-0 overflow-y-auto">
-                    {isAttendanceLoading ? <p>Loading...</p> : presentStudents.length > 0 ? (
+                    {presentStudents.length > 0 ? (
                         <div className="space-y-2">
                             {presentStudents.map(student => (
                                 <div key={student.id} className="flex items-center gap-3 text-sm">
@@ -353,5 +391,3 @@ export default function SubjectAttendancePage() {
     </>
   );
 }
-
-    
