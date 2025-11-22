@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { ColumnDef } from "@tanstack/react-table";
@@ -30,6 +31,9 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import Image from "next/image";
+import { useState } from "react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { groupBy } from "lodash";
 
 const SessionToggle = ({ subjectId }: { subjectId: string }) => {
   const firestore = useFirestore();
@@ -72,14 +76,22 @@ const SessionToggle = ({ subjectId }: { subjectId: string }) => {
   );
 };
 
-const EnrollmentQrCodeDialog = ({ subject }: { subject: Subject }) => {
-  const enrollmentData = JSON.stringify({ type: 'enrollment', subjectId: subject.id });
+const EnrollmentQrCodeDialog = ({ subject, allSubjects }: { subject: Subject; allSubjects: Subject[] }) => {
+  const [selectedSubjectId, setSelectedSubjectId] = useState<string>(subject.id);
+
+  // Group all subjects by code to find related blocks
+  const groupedSubjects = useMemo(() => groupBy(allSubjects, 'code'), [allSubjects]);
+  const relatedBlocks = groupedSubjects[subject.code] || [];
+
+  const selectedSubject = allSubjects.find(s => s.id === selectedSubjectId) || subject;
+  
+  const enrollmentData = JSON.stringify({ type: 'enrollment', subjectId: selectedSubject.id });
   const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(enrollmentData)}`;
 
   return (
     <Dialog>
       <DialogTrigger asChild>
-        <div className="relative flex cursor-default select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none transition-colors focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50">
+        <div className="relative flex cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none transition-colors focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50">
           <QrCode className="mr-2 h-4 w-4" />
           <span>Enrollment QR</span>
         </div>
@@ -88,17 +100,37 @@ const EnrollmentQrCodeDialog = ({ subject }: { subject: Subject }) => {
         <DialogHeader>
           <DialogTitle>Enrollment QR Code</DialogTitle>
           <DialogDescription>
-            Students can scan this code to enroll in {subject.name} ({subject.block}).
+            Generate a QR code for a specific block of {subject.name}.
           </DialogDescription>
         </DialogHeader>
-        <div className="flex items-center justify-center p-4 bg-white rounded-lg">
-          <Image
-            src={qrCodeUrl}
-            alt={`Enrollment QR Code for ${subject.name}`}
-            width={250}
-            height={250}
-          />
+        
+        <div className="space-y-4">
+            <div className="space-y-2">
+                <Label htmlFor="block-select">Select Block</Label>
+                <Select value={selectedSubjectId} onValueChange={setSelectedSubjectId}>
+                    <SelectTrigger id="block-select">
+                        <SelectValue placeholder="Select a block..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {relatedBlocks.map(blockSubject => (
+                            <SelectItem key={blockSubject.id} value={blockSubject.id}>
+                                {blockSubject.block}
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            </div>
+
+            <div className="flex items-center justify-center p-4 bg-white rounded-lg">
+                <Image
+                    src={qrCodeUrl}
+                    alt={`Enrollment QR Code for ${selectedSubject.name} (${selectedSubject.block})`}
+                    width={250}
+                    height={250}
+                />
+            </div>
         </div>
+
       </DialogContent>
     </Dialog>
   );
@@ -106,9 +138,10 @@ const EnrollmentQrCodeDialog = ({ subject }: { subject: Subject }) => {
 
 type GetColumnsProps = {
   onEdit: (subject: Subject) => void;
+  allSubjects: Subject[];
 }
 
-export const getColumns = ({ onEdit }: GetColumnsProps): ColumnDef<Subject>[] => [
+export const getColumns = ({ onEdit, allSubjects }: GetColumnsProps): ColumnDef<Subject>[] => [
   {
     accessorKey: "name",
     header: ({ column }) => {
@@ -180,7 +213,7 @@ export const getColumns = ({ onEdit }: GetColumnsProps): ColumnDef<Subject>[] =>
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => onEdit(subject)}>Edit Subject</DropdownMenuItem>
               <DropdownMenuSeparator />
-              <EnrollmentQrCodeDialog subject={subject} />
+              <EnrollmentQrCodeDialog subject={subject} allSubjects={allSubjects} />
               <DropdownMenuSeparator />
               <DropdownMenuItem className="text-destructive focus:text-destructive-foreground focus:bg-destructive">Delete Subject</DropdownMenuItem>
             </DropdownMenuContent>

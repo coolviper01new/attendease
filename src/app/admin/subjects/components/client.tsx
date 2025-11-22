@@ -40,7 +40,7 @@ export function SubjectClient({ data, isLoading, onEdit }: SubjectClientProps) {
     []
   );
 
-  const columns = React.useMemo(() => getColumns({ onEdit }), [onEdit]);
+  const columns = React.useMemo(() => getColumns({ onEdit, allSubjects: data }), [onEdit, data]);
   
   const table = useReactTable({
     data,
