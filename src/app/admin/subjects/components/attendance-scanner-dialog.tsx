@@ -99,16 +99,14 @@ export function AttendanceScannerDialog({
     useCollection<AttendanceSession>(activeSessionQuery);
   const activeSession = activeSessions?.[0];
   
-  const todayDateString = new Date().toISOString().split('T')[0];
-  
   const todaysAttendanceQuery = useMemoFirebase(
-      () => 
-          open ? query(
-              collectionGroup(firestore, 'attendance'),
-              where('subjectId', '==', subject.id),
-              where('date', '==', todayDateString)
-          ) : null,
-      [firestore, subject.id, open, todayDateString]
+      () => {
+          if (!open || !activeSession) return null;
+          return query(
+              collection(firestore, `subjects/${subject.id}/attendanceSessions/${activeSession.id}/attendance`)
+          )
+      },
+      [firestore, subject.id, open, activeSession]
   );
   const { data: todaysAttendance, isLoading: isAttendanceLoading } = useCollection<Attendance>(todaysAttendanceQuery);
 
@@ -121,7 +119,6 @@ export function AttendanceScannerDialog({
               const uniqueStudentIds = [...new Set(studentIds)]; // Handle potential duplicates if any
               const studentRefs = uniqueStudentIds.map(id => doc(firestore, 'users', id));
               
-              // This can be slow with many students. Consider denormalizing student name onto attendance record.
               const studentSnaps = await Promise.all(studentRefs.map(ref => getDoc(ref).catch(e => null))); // Non-blocking, catch errors
               const studentsData = studentSnaps
                 .filter(snap => snap && snap.exists())
@@ -333,7 +330,7 @@ export function AttendanceScannerDialog({
               timestamp: serverTimestamp(),
               status: 'present',
               recordedBy: adminUser.uid,
-              date: todayDateString,
+              date: new Date().toISOString(),
             };
             setDoc(attendanceDocRef, attendanceData).catch(error => {
                 errorEmitter.emit(
@@ -382,7 +379,6 @@ export function AttendanceScannerDialog({
     firestore,
     subject.id,
     presentStudents,
-    todayDateString
   ]);
 
   useEffect(() => {
@@ -584,3 +580,5 @@ export function AttendanceScannerDialog({
     </Dialog>
   );
 }
+
+    

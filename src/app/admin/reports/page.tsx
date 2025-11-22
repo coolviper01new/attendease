@@ -69,7 +69,8 @@ export default function AdminReportsPage() {
                     return {
                         ...att,
                         studentName: student ? `${student.firstName} ${student.lastName}` : 'N/A',
-                        subjectName: subject?.name || 'N/A'
+                        subjectName: subject?.name || 'N/A',
+                        date: new Date(att.date).toISOString() // Standardize date
                     };
                 });
                 
@@ -146,3 +147,5 @@ export default function AdminReportsPage() {
     </>
   );
 }
+
+    
