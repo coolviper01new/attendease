@@ -108,12 +108,10 @@ const ScheduleArray = ({ control, setValue, getValues, name, label, description 
       if (sourceSchedule) {
           const targetFieldIndex = allFormSchedules.findIndex(f => f.day === targetDay);
           if (targetFieldIndex !== -1) {
-            update(targetFieldIndex, {
-                ...allFormSchedules[targetFieldIndex],
-                startTime: sourceSchedule.startTime,
-                endTime: sourceSchedule.endTime,
-                room: sourceSchedule.room,
-            });
+            // Use the correct setValue function to update the form state
+            setValue(`${name}.${targetFieldIndex}.startTime`, sourceSchedule.startTime);
+            setValue(`${name}.${targetFieldIndex}.endTime`, sourceSchedule.endTime);
+            setValue(`${name}.${targetFieldIndex}.room`, sourceSchedule.room);
           }
       }
     };
@@ -214,6 +212,7 @@ const ScheduleArray = ({ control, setValue, getValues, name, label, description 
 
 export function AddSubjectForm({ onSuccess, subject }: AddSubjectFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [pageAlert, setPageAlert] = useState<{title: string, description: string, variant: 'default' | 'destructive'} | null>(null);
   const firestore = useFirestore();
   
   const isEditMode = !!subject;
@@ -272,6 +271,7 @@ export function AddSubjectForm({ onSuccess, subject }: AddSubjectFormProps) {
 
   const onSubmit = async (values: SubjectFormValues) => {
     setIsSubmitting(true);
+    setPageAlert(null);
     
     const subjectData: Partial<Subject> = values;
     if (!subjectData.hasLab) {
@@ -290,6 +290,7 @@ export function AddSubjectForm({ onSuccess, subject }: AddSubjectFormProps) {
                 operation: 'update',
                 requestResourceData: subjectData,
             }));
+            setPageAlert({ title: 'Update Failed', description: 'Could not update subject. Please check permissions.', variant: 'destructive' });
         }).finally(() => {
             setIsSubmitting(false);
         });
@@ -302,6 +303,7 @@ export function AddSubjectForm({ onSuccess, subject }: AddSubjectFormProps) {
                 operation: 'create',
                 requestResourceData: subjectData,
             }));
+            setPageAlert({ title: 'Creation Failed', description: 'Could not create subject. Please check permissions.', variant: 'destructive' });
         }).finally(() => {
             setIsSubmitting(false);
         });
@@ -311,6 +313,7 @@ export function AddSubjectForm({ onSuccess, subject }: AddSubjectFormProps) {
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+        {pageAlert && <Alert variant={pageAlert.variant}><AlertTitle>{pageAlert.title}</AlertTitle><AlertDescription>{pageAlert.description}</AlertDescription></Alert>}
         <div className="grid grid-cols-2 gap-4">
             <FormField
             control={form.control}
