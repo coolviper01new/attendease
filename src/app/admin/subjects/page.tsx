@@ -26,7 +26,7 @@ export default function AdminSubjectsPage() {
   
   const firestore = useFirestore();
   
-  const subjectsQuery = useMemoFirebase(() => query(collection(firestore, 'subjects'), where('deleted', '!=', true)), [firestore]);
+  const subjectsQuery = useMemoFirebase(() => query(collection(firestore, 'subjects')), [firestore]);
   const { data: subjects, isLoading, forceRefresh } = useCollection<Subject>(subjectsQuery);
 
   const handleAddNew = () => {
@@ -89,3 +89,5 @@ export default function AdminSubjectsPage() {
     </>
   );
 }
+
+    

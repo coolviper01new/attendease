@@ -31,7 +31,7 @@ import { Label } from "@/components/ui/label";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
-import { collection, query, where, doc, updateDoc, writeBatch, collectionGroup, getDocs } from "firebase/firestore";
+import { collection, query, where, doc, updateDoc, writeBatch, collectionGroup, getDocs, deleteDoc } from "firebase/firestore";
 import {
   Dialog,
   DialogContent,
@@ -210,7 +210,7 @@ const DeleteSubjectAction = ({ subject, onDeleted }: { subject: Subject; onDelet
             const subjectRef = doc(firestore, 'subjects', subject.id);
             
             // Use .catch() for permission error handling instead of try/catch
-            updateDoc(subjectRef, { "deleted": true }).then(() => { // Soft delete for safety
+            deleteDoc(subjectRef).then(() => { 
                 toast({
                     title: 'Subject Deleted',
                     description: `${subject.name} (${subject.block}) has been deleted.`,
@@ -323,10 +323,10 @@ export const getColumns = ({ onEdit, onRefresh }: GetColumnsProps): ColumnDef<Su
         {row.getIsGrouped() ? (
           <div className="font-bold">{row.original.name}</div>
         ) : (
-          <>
+          <Link href={`/admin/subjects/${row.original.id}`} className="hover:underline">
             <div className="font-medium">{row.original.name}</div>
             <div className="text-xs text-muted-foreground">{row.original.code}</div>
-          </>
+          </Link>
         )}
       </div>
     ),
@@ -402,3 +402,5 @@ export const getColumns = ({ onEdit, onRefresh }: GetColumnsProps): ColumnDef<Su
     cell: (props) => <ActionsCell {...props} onEdit={onEdit} onRefresh={onRefresh} />,
   },
 ];
+
+    
