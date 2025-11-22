@@ -34,6 +34,10 @@ export type Subject = {
   schedule: { day: string; startTime: string; endTime: string; room: string };
   blockId: string;
   semesterId: string;
+  schoolYearId: string;
+  yearLevelId: string;
+  schoolYearName?: string;
+  yearLevelName?: string;
 };
 
 export type Registration = {

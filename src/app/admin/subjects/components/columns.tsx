@@ -80,26 +80,22 @@ export const columns: ColumnDef<Subject>[] = [
       <div className="pl-4">
         <div className="font-medium">{row.original.name}</div>
         <div className="text-xs text-muted-foreground">{row.original.code}</div>
+        <div className="text-xs text-muted-foreground truncate max-w-xs">{row.original.description}</div>
       </div>
     ),
   },
   {
-    accessorKey: "schedule",
-    header: "Schedule",
-    cell: ({ row }) => {
-      const { day, startTime, endTime, room } = row.original.schedule;
-      return (
-        <div>
-          <div>{day}</div>
-          <div className="text-xs text-muted-foreground">{`${startTime} - ${endTime} | ${room}`}</div>
-        </div>
-      );
-    },
+    accessorKey: "schoolYearName",
+    header: "School Year",
+  },
+  {
+    accessorKey: "yearLevelName",
+    header: "Year Level",
   },
    {
     accessorKey: "blockId",
-    header: "Block",
-     cell: ({ row }) => <Badge variant="outline">{row.original.blockId?.toLocaleUpperCase() ?? 'N/A'}</Badge>,
+    header: "Blocks",
+     cell: ({ row }) => <Badge variant="outline">{row.original.blockId ? 1 : 0}</Badge>,
   },
   {
     id: "sessionStatus",
@@ -133,5 +129,4 @@ export const columns: ColumnDef<Subject>[] = [
     },
   },
 ];
-
     

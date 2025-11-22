@@ -1,3 +1,4 @@
+
 {
   "entities": {
     "SchoolYear": {
@@ -148,20 +149,41 @@
           "type": "string",
           "description": "Name of the subject."
         },
+        "code": {
+          "type": "string",
+          "description": "The unique code for the subject (e.g., CS101)."
+        },
         "description": {
           "type": "string",
           "description": "Description of the subject."
         },
         "schedule": {
-          "type": "string",
+          "type": "object",
+          "properties": {
+            "day": { "type": "string" },
+            "startTime": { "type": "string" },
+            "endTime": { "type": "string" },
+            "room": { "type": "string" }
+          },
           "description": "Schedule details (day, time, room)."
+        },
+        "schoolYearId": {
+          "type": "string",
+          "description": "Reference to the SchoolYear."
+        },
+        "yearLevelId": {
+          "type": "string",
+          "description": "Reference to the YearLevel."
         }
       },
       "required": [
         "id",
         "name",
+        "code",
         "description",
-        "schedule"
+        "schedule",
+        "schoolYearId",
+        "yearLevelId"
       ]
     },
     "Registration": {

@@ -8,14 +8,37 @@ import { SubjectClient } from "./components/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
 import { collection } from 'firebase/firestore';
-import type { Subject } from "@/lib/types";
+import type { Subject, SchoolYear, YearLevel } from "@/lib/types";
+import { useMemo } from "react";
 
 export default function AdminSubjectsPage() {
   const firestore = useFirestore();
+  
   const subjectsQuery = useMemoFirebase(() => collection(firestore, 'subjects'), [firestore]);
-  const { data: subjectsData, isLoading } = useCollection<Subject>(subjectsQuery);
+  const { data: subjectsData, isLoading: subjectsLoading } = useCollection<Subject>(subjectsQuery);
 
-  const subjects = subjectsData || [];
+  const schoolYearsQuery = useMemoFirebase(() => collection(firestore, 'schoolYears'), [firestore]);
+  const { data: schoolYearsData, isLoading: schoolYearsLoading } = useCollection<SchoolYear>(schoolYearsQuery);
+
+  const yearLevelsQuery = useMemoFirebase(() => collection(firestore, 'yearLevels'), [firestore]);
+  const { data: yearLevelsData, isLoading: yearLevelsLoading } = useCollection<YearLevel>(yearLevelsQuery);
+
+  const isLoading = subjectsLoading || schoolYearsLoading || yearLevelsLoading;
+
+  const subjects = useMemo(() => {
+    if (!subjectsData || !schoolYearsData || !yearLevelsData) {
+      return [];
+    }
+
+    const schoolYearMap = new Map(schoolYearsData.map(sy => [sy.id, sy.name]));
+    const yearLevelMap = new Map(yearLevelsData.map(yl => [yl.id, yl.name]));
+
+    return subjectsData.map(subject => ({
+      ...subject,
+      schoolYearName: schoolYearMap.get(subject.schoolYearId) ?? 'N/A',
+      yearLevelName: yearLevelMap.get(subject.yearLevelId) ?? 'N/A',
+    }));
+  }, [subjectsData, schoolYearsData, yearLevelsData]);
 
   return (
     <>
@@ -36,5 +59,4 @@ export default function AdminSubjectsPage() {
     </>
   );
 }
-
     
