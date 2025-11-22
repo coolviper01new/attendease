@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -24,6 +23,8 @@ import type { Subject, Student, Attendance, Registration, AttendanceSession } fr
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { FirestorePermissionError } from '@/firebase/errors';
+import { errorEmitter } from '@/firebase/error-emitter';
 
 interface AttendanceListDialogProps {
   subject: Subject;
@@ -74,41 +75,54 @@ export function AttendanceListDialog({
     const fetchAllData = async () => {
         setIsLoading(true);
 
-        // 3. Get all students registered for this subject
-        const registrationsQuery = query(collectionGroup(firestore, 'registrations'), where('subjectId', '==', subject.id));
-        const registrationsSnapshot = await getDocs(registrationsQuery);
-        const studentIds = registrationsSnapshot.docs.map(doc => (doc.data() as Registration).studentId);
+        try {
+            // 3. Get all students registered for this subject
+            const registrationsQuery = query(collectionGroup(firestore, 'registrations'), where('subjectId', '==', subject.id));
+            const registrationsSnapshot = await getDocs(registrationsQuery);
+            const studentIds = registrationsSnapshot.docs.map(doc => (doc.data() as Registration).studentId);
 
-        if (studentIds.length > 0) {
-            const studentsQuery = query(collection(firestore, 'users'), where('__name__', 'in', studentIds));
-            const studentsSnapshot = await getDocs(studentsQuery);
-            const enrolledStudents = studentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Student & { id: string }));
+            if (studentIds.length > 0) {
+                const studentsQuery = query(collection(firestore, 'users'), where('__name__', 'in', studentIds));
+                const studentsSnapshot = await getDocs(studentsQuery);
+                const enrolledStudents = studentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Student & { id: string }));
 
-            // 4. Combine the lists
-            const presentStudentIds = new Set(attendanceRecords?.map(rec => rec.studentId));
-            
-            const list: CombinedAttendanceInfo[] = enrolledStudents.map(student => {
-                const attendanceRecord = attendanceRecords?.find(rec => rec.studentId === student.id);
-                return {
-                    student: student,
-                    status: presentStudentIds.has(student.id) ? 'present' : 'absent',
-                    timestamp: attendanceRecord?.timestamp?.toDate(),
-                };
-            });
-            
-            // Sort by status (absent first) then by name
-            list.sort((a, b) => {
-                if (a.status === 'absent' && b.status === 'present') return -1;
-                if (a.status === 'present' && b.status === 'absent') return 1;
-                return a.student.name.localeCompare(b.student.name);
-            });
+                // 4. Combine the lists
+                const presentStudentIds = new Set(attendanceRecords?.map(rec => rec.studentId));
+                
+                const list: CombinedAttendanceInfo[] = enrolledStudents.map(student => {
+                    const attendanceRecord = attendanceRecords?.find(rec => rec.studentId === student.id);
+                    return {
+                        student: student,
+                        status: presentStudentIds.has(student.id) ? 'present' : 'absent',
+                        timestamp: attendanceRecord?.timestamp?.toDate(),
+                    };
+                });
+                
+                // Sort by status (absent first) then by name
+                list.sort((a, b) => {
+                    if (a.status === 'absent' && b.status === 'present') return -1;
+                    if (a.status === 'present' && b.status === 'absent') return 1;
+                    return a.student.firstName.localeCompare(b.student.firstName);
+                });
 
-            setCombinedList(list);
-        } else {
-            setCombinedList([]);
+                setCombinedList(list);
+            } else {
+                setCombinedList([]);
+            }
+        } catch(e) {
+            const error = e as any;
+             if (error?.code === 'permission-denied') {
+                const permissionError = new FirestorePermissionError({
+                    path: `registrations`,
+                    operation: 'list',
+                });
+                errorEmitter.emit('permission-error', permissionError);
+            } else {
+                console.error("An unexpected error occurred in AttendanceListDialog:", error);
+            }
+        } finally {
+            setIsLoading(false);
         }
-
-        setIsLoading(false);
     };
     
     // Only run if we have the session info and attendance has loaded
@@ -158,7 +172,7 @@ export function AttendanceListDialog({
                                 <AvatarImage src={record.student.avatarUrl} />
                                 <AvatarFallback>{record.student.firstName?.charAt(0)}{record.student.lastName?.charAt(0)}</AvatarFallback>
                             </Avatar>
-                            <div>{record.student.name}</div>
+                            <div>{record.student.firstName} {record.student.lastName}</div>
                         </div>
                     </TableCell>
                     <TableCell>{record.student.studentNumber}</TableCell>
