@@ -113,6 +113,10 @@ export function AttendanceScannerDialog({
         
         if (attendanceRecords.length > 0) {
           const studentIds = attendanceRecords.map(att => att.studentId);
+          if (studentIds.length === 0) {
+              setPresentStudents([]);
+              return;
+          }
           const studentRefs = studentIds.map(id => doc(firestore, 'users', id));
           const studentSnaps = await Promise.all(studentRefs.map(ref => getDoc(ref)));
           const studentsData = studentSnaps
@@ -414,20 +418,11 @@ export function AttendanceScannerDialog({
                 Please show your Subject QR Code Generated at least 1 foot to the device camera. Thank you
               </AlertDescription>
             </Alert>
-            {confirmationMessage && (
-                <Alert variant="default" className="mt-2 bg-green-500/10 border-green-500/20 text-green-700">
-                    <CheckCircle className="h-4 w-4" />
-                    <AlertTitle>Success!</AlertTitle>
-                    <AlertDescription>
-                        {confirmationMessage}
-                    </AlertDescription>
-                </Alert>
-            )}
         </DialogHeader>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start h-full overflow-hidden">
           {/* Left Column: Scanner and Controls */}
           <div className="flex flex-col gap-4 h-full">
-            <div className="aspect-video w-full rounded-lg border bg-background overflow-hidden relative">
+            <div className="aspect-video w-full rounded-lg border bg-background overflow-hidden relative flex items-center justify-center">
               <video
                 ref={videoRef}
                 className="h-full w-full object-cover"
@@ -455,6 +450,16 @@ export function AttendanceScannerDialog({
                       Click "Start Session" to begin scanning.
                     </p>
                   </div>
+                </div>
+              )}
+               {confirmationMessage && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/70">
+                    <Card className="bg-green-600/90 text-primary-foreground text-center p-8">
+                        <CardContent className="p-0 flex flex-col items-center gap-4">
+                            <CheckCircle className="w-16 h-16" />
+                            <p className="text-2xl font-bold">{confirmationMessage}</p>
+                        </CardContent>
+                    </Card>
                 </div>
               )}
               {isProcessing && !confirmationMessage && (
