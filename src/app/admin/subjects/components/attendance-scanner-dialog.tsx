@@ -103,29 +103,39 @@ export function AttendanceScannerDialog({
   useEffect(() => {
     const fetchInitialAttendees = async () => {
       if (activeSession && open) {
-        const attendanceSnapshot = await getDocs(
-          collection(
+        const attendanceCollectionRef = collection(
             firestore,
             `subjects/${subject.id}/attendanceSessions/${activeSession.id}/attendance`
-          )
-        );
-        const attendanceRecords = attendanceSnapshot.docs.map(d => d.data() as Attendance);
+          );
         
-        if (attendanceRecords.length > 0) {
-          const studentIds = attendanceRecords.map(att => att.studentId);
-          if (studentIds.length === 0) {
-              setPresentStudents([]);
-              return;
-          }
-          const studentRefs = studentIds.map(id => doc(firestore, 'users', id));
-          const studentSnaps = await Promise.all(studentRefs.map(ref => getDoc(ref)));
-          const studentsData = studentSnaps
-            .filter(snap => snap.exists())
-            .map(snap => ({ id: snap.id, ...snap.data() } as Student & { id: string }));
-          
-          setPresentStudents(studentsData.sort((a, b) => a.firstName.localeCompare(b.firstName)));
-        } else {
-            setPresentStudents([]);
+        try {
+            const attendanceSnapshot = await getDocs(attendanceCollectionRef);
+            const attendanceRecords = attendanceSnapshot.docs.map(d => d.data() as Attendance);
+            
+            if (attendanceRecords.length > 0) {
+              const studentIds = attendanceRecords.map(att => att.studentId);
+              if (studentIds.length === 0) {
+                  setPresentStudents([]);
+                  return;
+              }
+              const studentRefs = studentIds.map(id => doc(firestore, 'users', id));
+              // This part can be optimized if student data is denormalized on attendance record
+              const studentSnaps = await Promise.all(studentRefs.map(ref => getDoc(ref)));
+              const studentsData = studentSnaps
+                .filter(snap => snap.exists())
+                .map(snap => ({ id: snap.id, ...snap.data() } as Student & { id: string }));
+              
+              setPresentStudents(studentsData.sort((a, b) => a.firstName.localeCompare(b.firstName)));
+            } else {
+                setPresentStudents([]);
+            }
+        } catch (err) {
+            console.error("Error fetching initial attendees:", err);
+            const permissionError = new FirestorePermissionError({
+                path: attendanceCollectionRef.path,
+                operation: 'list',
+            });
+            errorEmitter.emit('permission-error', permissionError);
         }
       } else if (!open) {
         // Clear list when dialog closes
@@ -155,7 +165,19 @@ export function AttendanceScannerDialog({
       'attendanceSessions',
       activeSession.id
     );
-    await updateDoc(sessionRef, { isActive: false, endTime: serverTimestamp() });
+
+    const sessionData = { isActive: false, endTime: serverTimestamp() };
+    updateDoc(sessionRef, sessionData).catch(error => {
+        errorEmitter.emit(
+            'permission-error',
+            new FirestorePermissionError({
+                path: sessionRef.path,
+                operation: 'update',
+                requestResourceData: sessionData
+            })
+        )
+    });
+
     setPresentStudents([]); // Clear the list when session stops
     toast({ title: 'Attendance Session Stopped' });
     if(intervalRef.current) clearInterval(intervalRef.current);
@@ -300,27 +322,35 @@ export function AttendanceScannerDialog({
       const result = await validateAttendance(validationInput);
 
       if (result.isValid) {
-        const studentDoc = await getDoc(doc(firestore, 'users', qrData.studentId));
+        const studentDocRef = doc(firestore, 'users', qrData.studentId);
+        const studentDoc = await getDoc(studentDocRef);
         
         if (studentDoc.exists()) {
             const studentData = { id: studentDoc.id, ...studentDoc.data() } as Student & { id: string };
             const studentName = `${studentData.firstName} ${studentData.lastName}`;
             
-            // 1. Set the confirmation message
             setConfirmationMessage(`${studentName}'s attendance is recorded`);
             
-            // 2. Manually add student to the local list
             setPresentStudents(prev => [...prev, studentData].sort((a,b) => a.firstName.localeCompare(b.firstName)));
 
-            // 3. Write to the database in the background
             const attendanceDocRef = doc(firestore, `subjects/${subject.id}/attendanceSessions/${activeSession.id}/attendance`, qrData.studentId);
-            setDoc(attendanceDocRef, {
+            const attendanceData = {
               studentId: qrData.studentId,
               subjectId: subject.id,
               timestamp: serverTimestamp(),
               status: 'present',
               recordedBy: adminUser.uid,
               date: new Date().toISOString().split('T')[0],
+            };
+            setDoc(attendanceDocRef, attendanceData).catch(error => {
+                errorEmitter.emit(
+                    'permission-error',
+                    new FirestorePermissionError({
+                        path: attendanceDocRef.path,
+                        operation: 'create',
+                        requestResourceData: attendanceData,
+                    })
+                )
             });
         } else {
              toast({
@@ -337,14 +367,14 @@ export function AttendanceScannerDialog({
         });
       }
     } catch (error: any) {
-        if (error.name !== 'FirebaseError') {
-          console.error('Error processing QR code:', error);
-          toast({
-            variant: 'destructive',
-            title: 'Scan Error',
-            description: 'The scanned QR code is not valid for this system.',
-          });
-        }
+        // This catch block is for JSON parsing errors or other unexpected issues,
+        // not for Firestore permissions, which are handled in the .catch() blocks.
+        console.error('Error processing QR code:', error);
+        toast({
+        variant: 'destructive',
+        title: 'Scan Error',
+        description: 'The scanned QR code is not valid for this system.',
+        });
     } finally {
       setTimeout(() => {
         setIsProcessing(false);
@@ -379,12 +409,23 @@ export function AttendanceScannerDialog({
       subject.id,
       'attendanceSessions'
     );
-    await addDoc(sessionCollectionRef, {
+    const sessionData = {
       subjectId: subject.id,
       startTime: serverTimestamp(),
       isActive: true,
       qrCodeSecret: newSessionSecret,
+    };
+    addDoc(sessionCollectionRef, sessionData).catch(error => {
+        errorEmitter.emit(
+            'permission-error',
+            new FirestorePermissionError({
+                path: sessionCollectionRef.path,
+                operation: 'create',
+                requestResourceData: sessionData
+            })
+        );
     });
+
     setTimeRemaining(20 * 60); // Start 20 minute timer
     toast({
       title: 'Attendance Session Started',
@@ -400,18 +441,19 @@ export function AttendanceScannerDialog({
     return `${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
+  const onDialogClose = (isOpen: boolean) => {
+    if (!isOpen) {
+        if (activeSession) {
+           handleStopSession();
+       }
+       onOpenChange(false);
+    } else {
+       onOpenChange(true);
+    }
+  }
 
   return (
-    <Dialog open={open} onOpenChange={(isOpen) => {
-        if (!isOpen) {
-             if (activeSession) {
-                handleStopSession();
-            }
-            onOpenChange(false);
-        } else {
-            onOpenChange(true);
-        }
-    }}>
+    <Dialog open={open} onOpenChange={onDialogClose}>
       <DialogContent className="max-w-6xl h-[90vh]">
         <DialogHeader className="text-center">
           <DialogTitle className="text-3xl font-bold font-headline">Attendance Scanner</DialogTitle>
@@ -423,7 +465,7 @@ export function AttendanceScannerDialog({
               </AlertDescription>
             </Alert>
              {confirmationMessage && (
-                <Alert className="mt-2 bg-green-600/10 border-green-600/20 text-green-700 font-semibold text-lg text-center">
+                 <Alert className="mt-2 bg-green-600/10 border-green-600/20 text-green-700 font-semibold text-lg text-center">
                     <CheckCircle className="h-5 w-5" />
                     <AlertTitle>{confirmationMessage}</AlertTitle>
                 </Alert>
@@ -552,3 +594,5 @@ export function AttendanceScannerDialog({
     </Dialog>
   );
 }
+
+    

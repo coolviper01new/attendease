@@ -62,17 +62,31 @@ const SessionToggle = ({ subjectId, onRefresh }: { subjectId: string, onRefresh:
     if (checked && !activeSession) {
       const newSessionSecret = `secret-${subjectId}-${Date.now()}`;
       const sessionCollectionRef = collection(firestore, 'subjects', subjectId, 'attendanceSessions');
-      await addDoc(sessionCollectionRef, {
+      const sessionData = {
         subjectId: subjectId,
         startTime: serverTimestamp(),
         isActive: true,
         qrCodeSecret: newSessionSecret
+      };
+      addDoc(sessionCollectionRef, sessionData).catch(err => {
+        errorEmitter.emit('permission-error', new FirestorePermissionError({
+          path: sessionCollectionRef.path,
+          operation: 'create',
+          requestResourceData: sessionData,
+        }));
       });
       forceRefresh();
       onRefresh();
     } else if (!checked && activeSession) {
       const sessionRef = doc(firestore, 'subjects', subjectId, 'attendanceSessions', activeSession.id);
-      await updateDoc(sessionRef, { isActive: false, endTime: serverTimestamp() });
+      const sessionData = { isActive: false, endTime: serverTimestamp() };
+      updateDoc(sessionRef, sessionData).catch(err => {
+        errorEmitter.emit('permission-error', new FirestorePermissionError({
+          path: sessionRef.path,
+          operation: 'update',
+          requestResourceData: sessionData,
+        }));
+      });
       forceRefresh();
       onRefresh();
     }
@@ -139,25 +153,24 @@ const StartEnrollmentAction = ({ subject, onStarted }: { subject: Subject; onSta
 
     const handleStartEnrollment = async () => {
         setIsSubmitting(true);
-        try {
-            const subjectRef = doc(firestore, 'subjects', subject.id);
-            await updateDoc(subjectRef, { enrollmentStatus: 'open' });
-            
+        const subjectRef = doc(firestore, 'subjects', subject.id);
+        const subjectData = { enrollmentStatus: 'open' };
+
+        updateDoc(subjectRef, subjectData).then(() => {
             toast({
                 title: 'Enrollment Started',
                 description: `Students can now enroll in ${subject.name} (${subject.block}).`,
             });
             onStarted();
-        } catch (error) {
-            console.error("Error starting enrollment: ", error);
-            toast({
-                variant: 'destructive',
-                title: 'Error',
-                description: 'Could not start enrollment. Please try again.',
-            });
-        } finally {
+        }).catch(error => {
+            errorEmitter.emit('permission-error', new FirestorePermissionError({
+                path: subjectRef.path,
+                operation: 'update',
+                requestResourceData: subjectData,
+            }));
+        }).finally(() => {
             setIsSubmitting(false);
-        }
+        });
     };
 
     return (
@@ -223,9 +236,9 @@ const DeleteSubjectAction = ({ subject, onDeleted }: { subject: Subject; onDelet
             onDeleted();
 
         } catch (error) {
-            console.error("Error deleting subject:", error);
+            const subjectRef = doc(firestore, 'subjects', subject.id);
             const permissionError = new FirestorePermissionError({
-                path: `subjects/${subject.id}`,
+                path: subjectRef.path,
                 operation: 'delete',
             });
             errorEmitter.emit('permission-error', permissionError);
@@ -422,3 +435,5 @@ export const getColumns = ({ onEdit, onRefresh }: GetColumnsProps): ColumnDef<Su
     cell: (props) => <ActionsCell {...props} onEdit={onEdit} onRefresh={onRefresh} />,
   },
 ];
+
+    

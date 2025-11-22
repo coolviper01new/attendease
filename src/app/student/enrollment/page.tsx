@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -20,12 +21,13 @@ import {
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, addDoc, serverTimestamp, query, where } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, query, where, doc } from 'firebase/firestore';
 import type { Subject, Registration } from '@/lib/types';
 import { groupBy } from 'lodash';
 import { Skeleton } from '@/components/ui/skeleton';
 import { BookOpen, Clock } from 'lucide-react';
-import { setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError } from '@/firebase/errors';
 
 function SubjectEnrollmentCard({ 
     subjectCode, 
@@ -67,31 +69,34 @@ function SubjectEnrollmentCard({
         }
 
         setIsSubmitting(true);
-        try {
-            const registrationData = {
-                studentId: user.uid,
-                subjectId: subjectToEnroll.id,
-                blockId: subjectToEnroll.block,
-                registrationDate: serverTimestamp(),
-            };
-            const registrationRef = collection(firestore, 'users', user.uid, 'registrations');
-            await addDoc(registrationRef, registrationData);
-
+        const registrationData = {
+            studentId: user.uid,
+            subjectId: subjectToEnroll.id,
+            blockId: subjectToEnroll.block,
+            registrationDate: serverTimestamp(),
+        };
+        const registrationRef = collection(firestore, 'users', user.uid, 'registrations');
+        
+        addDoc(registrationRef, registrationData).then(() => {
             toast({
                 title: 'Enrollment Successful',
                 description: `You have been enrolled in ${subjectToEnroll.name} (${selectedBlock}).`,
             });
             setSelectedBlock(null);
-        } catch (error) {
-            console.error('Enrollment error:', error);
-            toast({
-                variant: 'destructive',
-                title: 'Enrollment Failed',
-                description: 'There was a problem enrolling you in the subject. Please try again.',
-            });
-        } finally {
+        }).catch(error => {
+            const newDocId = "new_registration_id";
+            const newDocRef = doc(registrationRef, newDocId);
+            errorEmitter.emit(
+                'permission-error',
+                new FirestorePermissionError({
+                    path: newDocRef.path,
+                    operation: 'create',
+                    requestResourceData: registrationData
+                })
+            );
+        }).finally(() => {
             setIsSubmitting(false);
-        }
+        });
     };
     
     const isEnrolledInThisCourse = userRegistrations?.some(reg => subjects.some(s => s.id === reg.subjectId));
@@ -218,3 +223,5 @@ export default function EnrollmentPage() {
     </>
   );
 }
+
+    

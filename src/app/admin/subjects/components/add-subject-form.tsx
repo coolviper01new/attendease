@@ -32,6 +32,8 @@ import { Copy, PlusCircle, Trash2 } from 'lucide-react';
 import type { Subject, Registration } from '@/lib/types';
 import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError } from '@/firebase/errors';
 
 const schoolYearRegex = /^\d{4}-\d{4}$/;
 
@@ -280,38 +282,47 @@ export function AddSubjectForm({ onSuccess, subject }: AddSubjectFormProps) {
 
   const onSubmit = async (values: SubjectFormValues) => {
     setIsSubmitting(true);
-    try {
-        const subjectData = values;
-        if (!subjectData.hasLab) {
-            subjectData.labSchedules = []; // Ensure lab schedules are empty if hasLab is false
-        }
-        
-        const subjectsRef = collection(firestore, 'subjects');
+    
+    const subjectData: Partial<Subject> = values;
+    if (!subjectData.hasLab) {
+        subjectData.labSchedules = []; // Ensure lab schedules are empty if hasLab is false
+    }
+    
+    const subjectsRef = collection(firestore, 'subjects');
 
-        if (isEditMode && subject) {
-            const subjectDocRef = doc(subjectsRef, subject.id);
-            await updateDoc(subjectDocRef, subjectData);
+    if (isEditMode && subject) {
+        const subjectDocRef = doc(subjectsRef, subject.id);
+        updateDoc(subjectDocRef, subjectData).then(() => {
             toast({
                 title: 'Subject Updated',
                 description: `Details for ${values.name} (${values.block}) have been updated.`,
             });
-        } else {
-            await addDoc(subjectsRef, subjectData);
+            onSuccess();
+        }).catch(error => {
+            errorEmitter.emit('permission-error', new FirestorePermissionError({
+                path: subjectDocRef.path,
+                operation: 'update',
+                requestResourceData: subjectData,
+            }));
+        }).finally(() => {
+            setIsSubmitting(false);
+        });
+    } else {
+        addDoc(subjectsRef, subjectData).then(() => {
             toast({
                 title: 'Subject Created',
                 description: `${values.name} (${values.block}) has been created successfully.`,
             });
-        }
-        onSuccess();
-    } catch (error) {
-        console.error('Error saving subject:', error);
-        toast({
-            variant: 'destructive',
-            title: 'Error',
-            description: `Failed to save subject. Please try again.`,
+            onSuccess();
+        }).catch(error => {
+            errorEmitter.emit('permission-error', new FirestorePermissionError({
+                path: subjectsRef.path,
+                operation: 'create',
+                requestResourceData: subjectData,
+            }));
+        }).finally(() => {
+            setIsSubmitting(false);
         });
-    } finally {
-        setIsSubmitting(false);
     }
 };
   

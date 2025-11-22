@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -28,6 +29,8 @@ import { doc, collection, query, where, getDocs, updateDoc, getDoc } from 'fireb
 import type { Student, Subject, Registration, Schedule, AttendanceSession, Attendance } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError } from '@/firebase/errors';
 
 const QrCodeDialog = ({
   studentId,
@@ -254,12 +257,16 @@ export default function StudentDashboardPage() {
             getDocs(query(collection(firestore, 'subjects'), where('__name__', 'in', chunk)))
         );
 
-        const subjectSnapshots = await Promise.all(subjectPromises);
-        const subjectsData = subjectSnapshots.flatMap(snapshot => 
-            snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Subject))
-        );
+        try {
+            const subjectSnapshots = await Promise.all(subjectPromises);
+            const subjectsData = subjectSnapshots.flatMap(snapshot => 
+                snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Subject))
+            );
+            setEnrolledSubjects(subjectsData);
+        } catch (error) {
+            console.error("Error fetching enrolled subjects", error);
+        }
 
-        setEnrolledSubjects(subjectsData);
       } else {
         setEnrolledSubjects([]);
       }
@@ -273,21 +280,20 @@ export default function StudentDashboardPage() {
 
   const handleRegisterDevice = async () => {
     if (!userDocRef || !currentDeviceId) return;
-
-    try {
-        await updateDoc(userDocRef, { deviceId: currentDeviceId });
-        toast({
-            title: "Device Registered",
-            description: "This device has been successfully registered for QR code generation.",
-        });
-    } catch (error) {
-        console.error("Device registration error:", error);
-        toast({
-            variant: "destructive",
-            title: "Registration Failed",
-            description: "Could not register this device. Please try again."
-        })
-    }
+    const deviceData = { deviceId: currentDeviceId };
+    
+    updateDoc(userDocRef, deviceData).then(() => {
+      toast({
+          title: "Device Registered",
+          description: "This device has been successfully registered for QR code generation.",
+      });
+    }).catch(error => {
+      errorEmitter.emit('permission-error', new FirestorePermissionError({
+        path: userDocRef.path,
+        operation: 'update',
+        requestResourceData: deviceData
+      }))
+    })
   };
 
   const isDeviceRegistered = !!student?.deviceId;
@@ -410,3 +416,5 @@ export default function StudentDashboardPage() {
     </>
   );
 }
+
+    
