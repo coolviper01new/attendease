@@ -224,7 +224,7 @@ service cloud.firestore {
       /**
        * @description Manages individual student attendance records for a session.
        * @path /subjects/{subjectId}/attendanceSessions/{attendanceSessionId}/attendance/{attendanceId}
-       * @allow (create) A signed-in student can create their own attendance record.
+       * @allow (create) A signed-in student can create their own attendance record, or an admin can create one for them.
        * @allow (get) A student can read their own attendance record if the ID matches their UID. An admin can read any record.
        * @allow (list) An admin can list all records for a session.
        * @deny (list) A student cannot list all attendance records in a session.
@@ -234,7 +234,7 @@ service cloud.firestore {
       match /attendance/{attendanceId} {
         allow get: if isAdmin() || (isSignedIn() && attendanceId == request.auth.uid);
         allow list: if isAdmin();
-        allow create: if isSignedIn() && request.resource.data.studentId == request.auth.uid && attendanceId == request.auth.uid;
+        allow create: if isAdmin() || (isSignedIn() && request.resource.data.studentId == request.auth.uid && attendanceId == request.auth.uid);
         allow update: if false;
         allow delete: if isAdmin() && isExistingDoc();
       }
