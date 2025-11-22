@@ -47,7 +47,9 @@ export default function AdminReportsPage() {
                         subjectName: subject?.name || 'N/A'
                     };
                 });
-                setFormattedAttendance(fa);
+                if (isMounted) {
+                    setFormattedAttendance(fa);
+                }
                 
                 // Format warnings data
                 const fw = warnings.map(warn => {
@@ -59,7 +61,9 @@ export default function AdminReportsPage() {
                         subjectName: subject?.name || 'N/A'
                     };
                 });
-                setFormattedWarnings(fw);
+                if (isMounted) {
+                    setFormattedWarnings(fw);
+                }
 
             } catch (error) {
                 console.error("Error fetching report data:", error);
