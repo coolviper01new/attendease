@@ -2,7 +2,7 @@
 'use client';
 import Link from 'next/link';
 import { useMemo, useEffect } from 'react';
-import { AppWindow, User, LogOut, BookUser, CheckSquare, QrCode } from 'lucide-react';
+import { AppWindow, User, LogOut, BookUser, CheckSquare, QrCode, SmartphoneNfc } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import {
@@ -13,13 +13,26 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { signOut } from 'firebase/auth';
 import { useAuth } from '@/firebase';
 import type { Student } from '@/lib/types';
-import { doc } from 'firebase/firestore';
+import { doc, updateDoc } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError } from '@/firebase/errors';
 
 function StudentHeader() {
   const { user, isUserLoading } = useUser();
@@ -37,6 +50,18 @@ function StudentHeader() {
     await signOut(auth);
     router.push('/login');
   };
+
+  const handleRemoveDeviceRegistration = async () => {
+    if (!userDocRef) return;
+    const deviceData = { deviceId: null };
+    updateDoc(userDocRef, deviceData).catch(error => {
+      errorEmitter.emit('permission-error', new FirestorePermissionError({
+        path: userDocRef.path,
+        operation: 'update',
+        requestResourceData: deviceData
+      }))
+    })
+  }
 
   const isLoading = isUserLoading || isStudentLoading;
 
@@ -103,6 +128,30 @@ function StudentHeader() {
                   <User className="mr-2 h-4 w-4" />
                   <span>Profile</span>
                 </DropdownMenuItem>
+                 {student?.deviceId && (
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                        <SmartphoneNfc className="mr-2 h-4 w-4" />
+                        <span>Remove Device</span>
+                      </DropdownMenuItem>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          This will remove the registration from your current device. You will need to register a device again to generate QR codes for attendance.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleRemoveDeviceRegistration}>
+                          Confirm & Remove
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                )}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleLogout}>
                   <LogOut className="mr-2 h-4 w-4" />
