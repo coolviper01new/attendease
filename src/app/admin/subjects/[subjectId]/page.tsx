@@ -22,7 +22,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { useDoc, useCollection, useFirestore, useMemoFirebase } from "@/firebase";
-import { doc, collection, query, where, getDocs } from "firebase/firestore";
+import { doc, collection, query, where, getDocs, collectionGroup } from "firebase/firestore";
 import type { Subject, User, Student, Registration } from "@/lib/types";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useEffect, useState } from "react";
