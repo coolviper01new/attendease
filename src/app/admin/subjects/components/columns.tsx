@@ -258,15 +258,17 @@ export const getColumns = ({ onEdit, allSubjects, onRefresh }: GetColumnsProps):
         const { lectureSchedules, labSchedules, hasLab } = row.original;
         return (
             <div className="text-xs flex flex-col gap-2">
-                <div>
-                    <p className="font-semibold mb-1">Lecture</p>
-                    {lectureSchedules.map((s, i) => (
-                        <div key={`lec-${i}`} className="flex items-center gap-1 text-muted-foreground">
-                            <Clock className="w-3 h-3" />
-                            <span>{s.day}, {s.startTime}-{s.endTime} @ {s.room}</span>
-                        </div>
-                    ))}
-                </div>
+                {lectureSchedules && lectureSchedules.length > 0 && (
+                    <div>
+                        <p className="font-semibold mb-1">Lecture</p>
+                        {lectureSchedules.map((s, i) => (
+                            <div key={`lec-${i}`} className="flex items-center gap-1 text-muted-foreground">
+                                <Clock className="w-3 h-3" />
+                                <span>{s.day}, {s.startTime}-{s.endTime} @ {s.room}</span>
+                            </div>
+                        ))}
+                    </div>
+                )}
                 {hasLab && labSchedules && labSchedules.length > 0 && (
                     <div>
                         <p className="font-semibold mt-1 mb-1">Laboratory</p>
