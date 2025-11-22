@@ -12,9 +12,9 @@ import {
 } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
-import { doc, collection, query, where, getDocs, addDoc, updateDoc, serverTimestamp, writeBatch } from "firebase/firestore";
+import { doc, collection, query, where, getDocs, addDoc, updateDoc, serverTimestamp, writeBatch, getDoc, DocumentData } from "firebase/firestore";
 import type { Subject, User, Student, Registration, AttendanceSession, Attendance } from "@/lib/types";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { validateAttendance } from "@/ai/flows/attendance-validator";
@@ -29,6 +29,7 @@ export function AttendanceClient({ subject }: AttendanceClientProps) {
   const { user: adminUser } = useUser();
   const { toast } = useToast();
   const videoRef = useRef<HTMLVideoElement>(null);
+  const qrScannerRef = useRef<QrScanner | null>(null);
 
   const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
   const [scannedData, setScannedData] = useState<string | null>(null);
@@ -45,190 +46,167 @@ export function AttendanceClient({ subject }: AttendanceClientProps) {
   
   const sessionAttendanceQuery = useMemoFirebase(() => {
     if (!activeSession) return null;
-    return collection(firestore, `subjects/${subject.id}/attendanceSessions/${activeSession.id}/attendance`);
+    return query(collection(firestore, `subjects/${subject.id}/attendanceSessions/${activeSession.id}/attendance`));
   }, [firestore, subject.id, activeSession]);
   const { data: attendanceRecords } = useCollection<Attendance>(sessionAttendanceQuery);
-  
-  // --- Effect to fetch student details for those present ---
-  useEffect(() => {
-      let isMounted = true;
-      const fetchStudentDetails = async () => {
-          if (!attendanceRecords) {
-            setPresentStudents([]);
-            return;
-          }
 
-          if (attendanceRecords.length === 0) {
-            if (isMounted) setPresentStudents([]);
-            return;
-          }
+  // --- Effect to fetch student details for those present (optimized) ---
+   useEffect(() => {
+    if (!attendanceRecords) {
+      setPresentStudents([]);
+      return;
+    }
 
-          const studentIds = attendanceRecords.map(att => att.studentId);
-          if (studentIds.length === 0) {
-            if (isMounted) setPresentStudents([]);
-            return;
-          };
+    const currentStudentIds = new Set(presentStudents.map(p => p.id));
+    const newRecordIds = attendanceRecords.map(rec => rec.studentId);
+    
+    // Find which student IDs are new
+    const missingStudentIds = newRecordIds.filter(id => !currentStudentIds.has(id));
 
-          const studentChunks: string[][] = [];
-          for (let i = 0; i < studentIds.length; i += 30) {
-              studentChunks.push(studentIds.slice(i, i + 30));
-          }
+    if (missingStudentIds.length === 0) {
+      // Also handle removals if necessary (e.g., admin deletes an entry)
+      if (presentStudents.length !== newRecordIds.length) {
+        setPresentStudents(prev => prev.filter(p => newRecordIds.includes(p.id)));
+      }
+      return;
+    }
 
-          try {
-            const studentPromises = studentChunks.map(chunk => 
-                getDocs(query(collection(firestore, 'users'), where('__name__', 'in', chunk)))
-            );
-            const studentSnapshots = await Promise.all(studentPromises);
-            if (!isMounted) return;
+    const fetchNewStudents = async () => {
+      try {
+        const studentPromises = missingStudentIds.map(id => getDoc(doc(firestore, 'users', id)));
+        const studentSnapshots = await Promise.all(studentPromises);
+        
+        const newStudentsData = studentSnapshots
+          .filter(snapshot => snapshot.exists())
+          .map(snapshot => ({ id: snapshot.id, ...snapshot.data() } as Student & {id: string}));
 
-            const studentsData = studentSnapshots.flatMap(snapshot => 
-                snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Student & {id: string}))
-            );
-            setPresentStudents(studentsData);
-          } catch(e) {
-            console.error("Error fetching student details:", e);
-            if (isMounted) setPresentStudents([]);
-          }
-      };
-      
-      fetchStudentDetails();
+        setPresentStudents(prev => [...prev, ...newStudentsData].sort((a, b) => a.firstName.localeCompare(b.firstName)));
 
-      return () => { isMounted = false; }
-  }, [attendanceRecords, firestore]);
+      } catch (e) {
+        console.error("Error fetching new student details:", e);
+      }
+    };
+    
+    fetchNewStudents();
+
+  }, [attendanceRecords, firestore, presentStudents]);
+
 
   // --- Camera and QR Scanner Effects ---
-  useEffect(() => {
-    let isMounted = true;
+   useEffect(() => {
     const getCameraPermission = async () => {
-      if (!navigator.mediaDevices?.getUserMedia) {
-        if(isMounted) setHasCameraPermission(false);
-        console.error("Camera API not supported in this browser.");
-        return;
-      }
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
-        if (isMounted && videoRef.current) {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+        setHasCameraPermission(true);
+
+        if (videoRef.current) {
           videoRef.current.srcObject = stream;
-          setHasCameraPermission(true);
         }
       } catch (error) {
         console.error('Error accessing camera:', error);
-        if (isMounted) {
-          setHasCameraPermission(false);
-          toast({
-            variant: 'destructive',
-            title: 'Camera Access Denied',
-            description: 'Please enable camera permissions in your browser settings to use this feature.',
-          });
-        }
+        setHasCameraPermission(false);
+        toast({
+          variant: 'destructive',
+          title: 'Camera Access Denied',
+          description: 'Please enable camera permissions in your browser settings to use this app.',
+        });
       }
     };
+
     getCameraPermission();
-    return () => { isMounted = false; };
   }, [toast]);
 
+
   useEffect(() => {
-    if (!videoRef.current || !hasCameraPermission) return;
-    let isMounted = true;
-    const qrScanner = new QrScanner(
-      videoRef.current,
-      (result) => {
-        if (isMounted && result.data && result.data !== scannedData) {
-          setScannedData(result.data);
-        }
-      },
-      { 
-        onDecodeError: () => {},
-        highlightScanRegion: true,
-        highlightCodeOutline: true,
-      }
-    );
-    qrScanner.start();
+    if (videoRef.current && hasCameraPermission && !qrScannerRef.current) {
+        const qrScanner = new QrScanner(
+            videoRef.current,
+            (result) => {
+                // Set scanned data only if it's new to avoid re-triggering
+                setScannedData(current => current !== result.data ? result.data : current);
+            },
+            { 
+                onDecodeError: () => {},
+                highlightScanRegion: true,
+                highlightCodeOutline: true,
+            }
+        );
+        qrScanner.start();
+        qrScannerRef.current = qrScanner;
 
-    return () => {
-      isMounted = false;
-      qrScanner.stop();
-      qrScanner.destroy();
-    };
-  }, [hasCameraPermission, scannedData]);
-
-  // --- Attendance Processing Effect ---
-  useEffect(() => {
-    let isMounted = true;
-    const processScan = async () => {
-      if (!scannedData || isProcessing || !activeSession || !adminUser) return;
-
-      setIsProcessing(true);
-      
-      try {
-        const qrData = JSON.parse(scannedData);
-        
-        if (attendanceRecords?.some(att => att.studentId === qrData.studentId)) {
-          toast({ variant: 'destructive', title: 'Already Marked', description: 'This student has already been marked present for this session.' });
-          if(isMounted) {
-            setScannedData(null);
-            setIsProcessing(false);
-          }
-          return;
-        }
-
-        const studentRegQuery = query(collectionGroup(firestore, 'registrations'), where('studentId', '==', qrData.studentId), where('subjectId', '==', subject.id));
-        const studentRegSnapshot = await getDocs(studentRegQuery);
-        const isRegistered = !studentRegSnapshot.empty;
-
-        const studentQuery = query(collection(firestore, 'users'), where('__name__', '==', qrData.studentId));
-        const studentSnapshot = await getDocs(studentQuery);
-        const studentData = studentSnapshot.docs[0]?.data();
-
-
-        const validationInput = {
-          qrCodeData: scannedData,
-          subjectId: subject.id,
-          studentId: qrData.studentId,
-          qrCodeSecret: activeSession.qrCodeSecret,
-          attendanceSessionActive: activeSession.isActive,
-          studentRegistered: isRegistered
+        return () => {
+            qrScannerRef.current?.stop();
+            qrScannerRef.current?.destroy();
+            qrScannerRef.current = null;
         };
-        
-        const result = await validateAttendance(validationInput);
-        if (!isMounted) return;
+    }
+  }, [hasCameraPermission]);
 
-        if (result.isValid) {
-          if (sessionAttendanceQuery) {
-            await addDoc(sessionAttendanceQuery, {
-              studentId: qrData.studentId,
-              subjectId: subject.id,
-              timestamp: serverTimestamp(),
-              status: 'present',
-              recordedBy: adminUser.uid,
-              date: new Date().toISOString().split('T')[0],
-            });
-            toast({
-                title: "Attendance Marked!",
-                description: `${studentData?.firstName || 'Student'} ${studentData?.lastName || ''} marked as present.`,
-            });
-          }
-        } else {
-            toast({ variant: 'destructive', title: 'Invalid QR Code', description: result.reason || 'Could not validate attendance.' });
-        }
 
-      } catch (error) {
-        console.error('Error processing QR code:', error);
-        toast({ variant: 'destructive', title: 'Scan Error', description: 'The scanned QR code is not valid for this system.' });
-      } finally {
-        setTimeout(() => {
-          if(isMounted) {
-            setScannedData(null);
-            setIsProcessing(false);
-          }
-        }, 2000); // 2-second cooldown to prevent rapid re-scans
+  const processScan = useCallback(async () => {
+    if (!scannedData || isProcessing || !activeSession || !adminUser || !sessionAttendanceQuery) return;
+
+    setIsProcessing(true);
+    
+    try {
+      const qrData = JSON.parse(scannedData);
+      
+      if (presentStudents.some(p => p.id === qrData.studentId)) {
+        toast({ variant: 'destructive', title: 'Already Marked', description: 'This student has already been marked present.' });
+        return;
       }
-    };
-    
+
+      const studentRegQuery = query(collectionGroup(firestore, 'registrations'), where('studentId', '==', qrData.studentId), where('subjectId', '==', subject.id));
+      const studentRegSnapshot = await getDocs(studentRegQuery);
+      const isRegistered = !studentRegSnapshot.empty;
+
+      const validationInput = {
+        qrCodeData: scannedData,
+        subjectId: subject.id,
+        studentId: qrData.studentId,
+        qrCodeSecret: activeSession.qrCodeSecret,
+        attendanceSessionActive: activeSession.isActive,
+        studentRegistered: isRegistered
+      };
+      
+      const result = await validateAttendance(validationInput);
+
+      if (result.isValid) {
+        const studentDoc = await getDoc(doc(firestore, 'users', qrData.studentId));
+        const studentData = studentDoc.data() as Student | undefined;
+
+        await addDoc(collection(firestore, sessionAttendanceQuery.path), {
+          studentId: qrData.studentId,
+          subjectId: subject.id,
+          timestamp: serverTimestamp(),
+          status: 'present',
+          recordedBy: adminUser.uid,
+          date: new Date().toISOString().split('T')[0],
+        });
+        
+        toast({
+            title: "Attendance Marked!",
+            description: `${studentData?.firstName || 'Student'} ${studentData?.lastName || ''} marked as present.`,
+        });
+      } else {
+          toast({ variant: 'destructive', title: 'Invalid QR Code', description: result.reason || 'Could not validate attendance.' });
+      }
+
+    } catch (error) {
+      console.error('Error processing QR code:', error);
+      toast({ variant: 'destructive', title: 'Scan Error', description: 'The scanned QR code is not valid for this system.' });
+    } finally {
+      setTimeout(() => {
+        setIsProcessing(false);
+        setScannedData(null);
+      }, 2000); // 2-second cooldown
+    }
+  }, [scannedData, isProcessing, activeSession, adminUser, firestore, subject.id, toast, presentStudents, sessionAttendanceQuery]);
+
+
+  useEffect(() => {
     processScan();
-    
-    return () => { isMounted = false; }
-  }, [scannedData, isProcessing, activeSession, subject, firestore, toast, attendanceRecords, sessionAttendanceQuery, adminUser]);
+  }, [processScan]);
   
   // Clock effect
   useEffect(() => {
