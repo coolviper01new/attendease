@@ -19,8 +19,7 @@ export default function StudentAttendancePage() {
 
     const attendanceQuery = useMemoFirebase(() => {
         if (!user) return null;
-        // This query is expensive. It scans all attendance records.
-        // A better structure would be /users/{userId}/attendance
+        // This query is expensive. It scans all attendance records for the student across all subjects.
         return query(collectionGroup(firestore, 'attendance'), where('studentId', '==', user.uid));
     }, [user, firestore]);
     const { data: attendanceRecords, isLoading: isAttendanceLoading } = useCollection<Attendance>(attendanceQuery);
@@ -110,5 +109,3 @@ export default function StudentAttendancePage() {
         </>
     )
 }
-
-    

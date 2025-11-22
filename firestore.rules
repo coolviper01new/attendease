@@ -90,6 +90,16 @@ service cloud.firestore {
     match /{path=**}/registrations/{registrationId} {
       allow list: if isAdmin();
     }
+    
+    /**
+     * @description Governs collection group queries for attendance records.
+     * @path /{path=**}/attendance/{attendanceId}
+     * @allow (list) Allows a signed-in user to query the 'attendance' collection group
+     *               but only if they are filtering for their own records.
+     */
+    match /{path=**}/attendance/{attendanceId} {
+        allow list: if isSignedIn() && request.query.where.studentId == request.auth.uid;
+    }
 
 
     /*********************************************************************
