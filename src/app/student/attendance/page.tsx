@@ -1,10 +1,10 @@
 import { PageHeader } from "@/components/page-header";
 import { getStudentAttendance, mockStudents, mockSubjects } from "@/lib/data";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { StatCard } from "@/components/stat-card";
-import { Check, X, Clock } from "lucide-react";
+import { CheckCircle2, XCircle, Clock, BarChartHorizontal } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const student = mockStudents[0];
@@ -23,14 +23,18 @@ export default function StudentAttendancePage() {
             />
 
             <div className="grid gap-4 md:grid-cols-3 mb-6">
-                <StatCard title="Present" value={presentCount} icon={Check} />
-                <StatCard title="Absent" value={absentCount} icon={X} />
-                <StatCard title="Late" value={lateCount} icon={Clock} />
+                <StatCard title="Present" value={presentCount} icon={CheckCircle2} description={`${((presentCount / attendanceRecords.length) * 100).toFixed(0)}% attendance rate`} />
+                <StatCard title="Absent" value={absentCount} icon={XCircle} description={`${((absentCount / attendanceRecords.length) * 100).toFixed(0)}% absence rate`} />
+                <StatCard title="Late" value={lateCount} icon={Clock} description={`${((lateCount / attendanceRecords.length) * 100).toFixed(0)}% late rate`} />
             </div>
 
             <Card>
                 <CardHeader>
-                    <CardTitle>Attendance History</CardTitle>
+                    <CardTitle className="flex items-center gap-2 font-headline text-xl">
+                        <BarChartHorizontal className="h-5 w-5" />
+                        Attendance History
+                    </CardTitle>
+                    <CardDescription>A log of all your attendance records for the current semester.</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <div className="rounded-md border">
@@ -39,7 +43,7 @@ export default function StudentAttendancePage() {
                                 <TableRow>
                                     <TableHead>Date</TableHead>
                                     <TableHead>Subject</TableHead>
-                                    <TableHead>Status</TableHead>
+                                    <TableHead className="text-center">Status</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -48,10 +52,20 @@ export default function StudentAttendancePage() {
                                         const subject = mockSubjects.find(s => s.id === record.subjectId);
                                         return (
                                             <TableRow key={record.id}>
-                                                <TableCell>{new Date(record.date).toLocaleDateString()}</TableCell>
+                                                <TableCell className="font-medium">{new Date(record.date).toLocaleDateString()}</TableCell>
                                                 <TableCell>{subject?.name || 'N/A'}</TableCell>
-                                                <TableCell>
-                                                     <Badge variant={record.status === 'present' ? 'default' : record.status === 'absent' ? 'destructive' : 'secondary'} className={cn(record.status === 'present' && 'bg-green-600')}>{record.status}</Badge>
+                                                <TableCell className="text-center">
+                                                     <Badge 
+                                                        variant={record.status === 'present' ? 'default' : record.status === 'absent' ? 'destructive' : 'secondary'} 
+                                                        className={cn(
+                                                            'capitalize',
+                                                            record.status === 'present' && 'bg-green-100 text-green-800 border-green-200',
+                                                            record.status === 'absent' && 'bg-red-100 text-red-800 border-red-200',
+                                                            record.status === 'late' && 'bg-yellow-100 text-yellow-800 border-yellow-200'
+                                                            )}
+                                                     >
+                                                        {record.status}
+                                                     </Badge>
                                                 </TableCell>
                                             </TableRow>
                                         )

@@ -2,7 +2,7 @@ import { PageHeader } from "@/components/page-header";
 import { getStudentSubjects, mockStudents } from "@/lib/data";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { QrCode, Clock } from "lucide-react";
+import { QrCode, Clock, BookOpen } from "lucide-react";
 import Image from "next/image";
 import {
   Dialog,
@@ -53,12 +53,19 @@ export default function StudentDashboardPage() {
       />
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {subjects.map((subject) => (
-          <Card key={subject.id}>
+          <Card key={subject.id} className="flex flex-col">
             <CardHeader>
-              <CardTitle className="font-headline">{subject.name}</CardTitle>
-              <CardDescription>{subject.code}</CardDescription>
+                <div className="flex items-start justify-between">
+                    <div>
+                        <CardTitle className="font-headline text-xl mb-1">{subject.name}</CardTitle>
+                        <CardDescription>{subject.code}</CardDescription>
+                    </div>
+                    <div className="bg-primary/10 text-primary p-2 rounded-lg">
+                        <BookOpen className="w-5 h-5" />
+                    </div>
+                </div>
             </CardHeader>
-            <CardContent>
+            <CardContent className="flex-grow">
               <div className="flex items-center text-sm text-muted-foreground">
                 <Clock className="mr-2 h-4 w-4" />
                 <span>

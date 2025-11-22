@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { AppWindow, User } from "lucide-react";
+import { AppWindow, User, LogOut } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { mockStudents } from "@/lib/data";
@@ -11,39 +11,34 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
+import { PageHeader } from "@/components/page-header";
 
 const student = mockStudents[0]; // Mocking the logged-in student
 
 function StudentHeader() {
   return (
-    <header className="sticky top-0 z-40 w-full border-b bg-background">
-      <div className="container flex h-16 items-center space-x-4 sm:justify-between sm:space-x-0">
-        <div className="flex gap-6 md:gap-10">
-          <Link href="/student/dashboard" className="flex items-center space-x-2">
-            <AppWindow className="h-6 w-6 text-primary" />
-            <span className="inline-block font-bold font-headline">AttendEase</span>
-          </Link>
-          <nav className="flex gap-6">
-            <Link
-              href="/student/dashboard"
-              className="text-sm font-medium text-muted-foreground transition-colors hover:text-primary"
-            >
-              My Subjects
+    <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <div className="container flex h-16 items-center">
+        <div className="mr-4 hidden md:flex">
+            <Link href="/student/dashboard" className="mr-6 flex items-center space-x-2">
+                <AppWindow className="h-6 w-6 text-primary" />
+                <span className="font-bold font-headline">Crema</span>
             </Link>
-            <Link
-              href="/student/attendance"
-              className="text-sm font-medium text-muted-foreground transition-colors hover:text-primary"
-            >
-              My Attendance
-            </Link>
-          </nav>
         </div>
         
         <div className="flex flex-1 items-center justify-end space-x-4">
+            <nav className="flex items-center space-x-2">
+                <Button variant="ghost" asChild className="text-sm font-medium text-muted-foreground transition-colors hover:text-primary">
+                    <Link href="/student/dashboard">My Subjects</Link>
+                </Button>
+                <Button variant="ghost" asChild className="text-sm font-medium text-muted-foreground transition-colors hover:text-primary">
+                    <Link href="/student/attendance">My Attendance</Link>
+                </Button>
+            </nav>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="relative h-8 w-8 rounded-full">
-                <Avatar className="h-9 w-9">
+              <Button variant="ghost" className="relative h-10 w-10 rounded-full">
+                <Avatar className="h-10 w-10">
                   <AvatarImage src={student.avatarUrl} alt={student.name} />
                   <AvatarFallback>{student.name.charAt(0)}</AvatarFallback>
                 </Avatar>
@@ -60,7 +55,15 @@ function StudentHeader() {
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem>
-                Log out
+                <User className="mr-2 h-4 w-4" />
+                <span>Profile</span>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem asChild>
+                <Link href="/">
+                    <LogOut className="mr-2 h-4 w-4" />
+                    Log out
+                </Link>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
