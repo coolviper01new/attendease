@@ -68,7 +68,7 @@ export function AddSubjectForm({ onSuccess }: AddSubjectFormProps) {
     },
   });
 
-  const { fields, append, remove, update } = useFieldArray({
+  const { fields, append, remove } = useFieldArray({
     control: form.control,
     name: 'schedules',
   });
@@ -85,26 +85,29 @@ export function AddSubjectForm({ onSuccess }: AddSubjectFormProps) {
   };
 
   const handleCopySchedule = (targetIndex: number) => {
-    if (targetIndex === 0) {
+    const currentDay = fields[targetIndex].day;
+    const currentDayOrder = daysOfWeek.indexOf(currentDay);
+    
+    let sourceIndex = -1;
+    // Find the index of the previous checked day by iterating backwards
+    for (let i = currentDayOrder - 1; i >= 0; i--) {
+        const prevDay = daysOfWeek[i];
+        const foundIndex = fields.findIndex(field => field.day === prevDay);
+        if (foundIndex > -1) {
+            sourceIndex = foundIndex;
+            break;
+        }
+    }
+
+    if (sourceIndex === -1) {
       toast({
         variant: 'destructive',
         title: 'Cannot Copy',
-        description: 'There is no previous day to copy from.',
+        description: 'There is no previous checked day to copy from.',
       });
       return;
     }
   
-    const sourceIndex = fields.findIndex(field => field.day === daysOfWeek[daysOfWeek.indexOf(fields[targetIndex].day) - 1]);
-    
-    if (sourceIndex === -1) {
-       toast({
-        variant: 'destructive',
-        title: 'Cannot Copy',
-        description: 'Previous day is not checked.',
-      });
-      return;
-    }
-
     const sourceSchedule = form.getValues(`schedules.${sourceIndex}`);
     if (!sourceSchedule) return;
   
@@ -116,27 +119,25 @@ export function AddSubjectForm({ onSuccess }: AddSubjectFormProps) {
 
     toast({
       title: 'Schedule Copied',
-      description: `Schedule from ${sourceSchedule.day} has been copied.`,
+      description: `Schedule from ${sourceSchedule.day} has been copied to ${currentDay}.`,
     });
   };
 
   const onSubmit = async (values: SubjectFormValues) => {
     setIsSubmitting(true);
     try {
-      await addDoc(collection(firestore, 'subjects'), {
-        name: values.name,
-        code: values.code,
-        description: values.description,
-        schoolYear: values.schoolYear,
-        yearLevel: values.yearLevel,
-        block: values.block,
-        schedules: values.schedules,
-      });
+      const subjectData = {
+        ...values,
+        // Ensure we are only storing the data defined in the schema
+        // This is a simplified example; a real app might need more complex data transformation.
+      };
+      await addDoc(collection(firestore, 'subjects'), subjectData);
+      
       toast({
         title: 'Subject Created',
         description: `${values.name} has been added successfully.`,
       });
-      form.reset();
+      form.reset({schedules: []});
       onSuccess();
     } catch (error) {
       console.error('Error adding subject:', error);
@@ -309,7 +310,7 @@ export function AddSubjectForm({ onSuccess }: AddSubjectFormProps) {
                         variant="ghost" 
                         size="icon"
                         onClick={() => handleCopySchedule(fieldIndex)}
-                        aria-label="Copy schedule from previous day"
+                        aria-label="Copy schedule from previous checked day"
                       >
                         <Copy className="h-4 w-4" />
                       </Button>
