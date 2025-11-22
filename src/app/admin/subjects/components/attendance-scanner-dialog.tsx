@@ -24,6 +24,7 @@ import {
   Clock,
   Users,
   CameraOff,
+  CheckCircle,
 } from 'lucide-react';
 import QrScanner from 'qr-scanner';
 import { useToast } from '@/hooks/use-toast';
@@ -55,6 +56,11 @@ interface AttendanceScannerDialogProps {
   onRefresh: () => void;
 }
 
+type ScannedStudentInfo = {
+    name: string;
+    avatarUrl?: string;
+};
+
 export function AttendanceScannerDialog({
   subject,
   open,
@@ -74,6 +80,7 @@ export function AttendanceScannerDialog({
   >(null);
   const [scannedData, setScannedData] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [scannedStudentInfo, setScannedStudentInfo] = useState<ScannedStudentInfo | null>(null);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [presentStudents, setPresentStudents] = useState<
     (Student & { id: string })[]
@@ -310,12 +317,13 @@ export function AttendanceScannerDialog({
           date: new Date().toISOString().split('T')[0],
         });
 
-        toast({
-          title: 'Attendance Marked!',
-          description: `${studentData?.firstName || 'Student'} ${
-            studentData?.lastName || ''
-          } marked as present.`,
-        });
+        if (studentData) {
+            setScannedStudentInfo({
+                name: `${studentData.firstName} ${studentData.lastName}`,
+                avatarUrl: studentData.avatarUrl
+            });
+        }
+        // No toast needed here anymore, as the overlay provides feedback
       } else {
         toast({
           variant: 'destructive',
@@ -337,6 +345,7 @@ export function AttendanceScannerDialog({
       setTimeout(() => {
         setIsProcessing(false);
         setScannedData(null);
+        setScannedStudentInfo(null);
       }, 2000); // 2-second cooldown
     }
   }, [
@@ -437,7 +446,20 @@ export function AttendanceScannerDialog({
                   </div>
                 </div>
               )}
-              {isProcessing && (
+               {scannedStudentInfo && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 text-white p-4">
+                    <CheckCircle className="h-16 w-16 text-green-400 mb-4" />
+                    <Avatar className="h-24 w-24 mb-4 ring-4 ring-green-400">
+                        <AvatarImage src={scannedStudentInfo.avatarUrl} />
+                        <AvatarFallback>
+                            {scannedStudentInfo.name.split(' ').map(n => n[0]).join('')}
+                        </AvatarFallback>
+                    </Avatar>
+                    <h3 className="text-2xl font-bold">{scannedStudentInfo.name}</h3>
+                    <p className="text-lg text-green-300">Attendance successfully recorded.</p>
+                </div>
+              )}
+              {isProcessing && !scannedStudentInfo && (
                 <div className="absolute inset-0 flex items-center justify-center bg-black/60">
                   <p className="text-white text-lg animate-pulse">
                     Processing...
