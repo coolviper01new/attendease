@@ -2,71 +2,84 @@ import { PageHeader } from "@/components/page-header";
 import { StatCard } from "@/components/stat-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { mockStudents, mockSubjects, mockWarnings, mockAttendanceSessions, mockAttendance } from "@/lib/data";
-import { Users, Book, Clock, AlertTriangle, Activity } from "lucide-react";
-import { Bar, BarChart, CartesianGrid, ResponsiveContainer, XAxis, YAxis } from "recharts";
+import { Users, BookCheck, Wallet, Send, BarChartHorizontal } from "lucide-react";
+import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis, Legend } from "recharts";
 
 export default function AdminDashboardPage() {
-    const activeSessions = mockAttendanceSessions.filter(s => s.isActive).length;
-    const attendanceData = mockAttendance.reduce((acc, record) => {
-        const date = new Date(record.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-        if (!acc[date]) {
-            acc[date] = { date, present: 0, absent: 0 };
-        }
-        if (record.status === 'present' || record.status === 'late') {
-            acc[date].present++;
-        } else {
-            acc[date].absent++;
-        }
-        return acc;
-    }, {} as Record<string, { date: string; present: number; absent: number }>);
-    
-    const chartData = Object.values(attendanceData).slice(-7);
+    const totalStudents = mockStudents.length;
+    const totalSubjects = mockSubjects.length;
+    const totalWarnings = mockWarnings.length;
 
-  return (
-    <>
-      <PageHeader
-        title="Admin Dashboard"
-        description="Overview of the school's attendance and academic status."
-      />
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <StatCard title="Total Students" value={mockStudents.length} icon={Users} description="All registered students" />
-        <StatCard title="Total Subjects" value={mockSubjects.length} icon={Book} description="Across all blocks" />
-        <StatCard title="Active Sessions" value={activeSessions} icon={Clock} description="Attendance sessions currently open" />
-        <StatCard title="Warnings Issued" value={mockWarnings.length} icon={AlertTriangle} description="Total consecutive absence warnings" />
-      </div>
-      <div className="grid gap-4 mt-6">
-        <Card>
-            <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                    <Activity className="h-5 w-5" />
-                    Recent Attendance Trends
-                </CardTitle>
-            </CardHeader>
-            <CardContent className="pl-2">
-                <ResponsiveContainer width="100%" height={350}>
-                    <BarChart data={chartData}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis
-                            dataKey="date"
-                            stroke="#888888"
-                            fontSize={12}
-                            tickLine={false}
-                            axisLine={false}
-                        />
-                        <YAxis
-                            stroke="#888888"
-                            fontSize={12}
-                            tickLine={false}
-                            axisLine={false}
-                            tickFormatter={(value) => `${value}`}
-                        />
-                        <Bar dataKey="present" fill="hsl(var(--primary))" name="Present" radius={[4, 4, 0, 0]} />
-                        <Bar dataKey="absent" fill="hsl(var(--destructive))" name="Absent" radius={[4, 4, 0, 0]} />
-                    </BarChart>
-                </ResponsiveContainer>
-            </CardContent>
-        </Card>
-      </div>
-    </>
-  );
+    const last7Days = Array.from({ length: 7 }, (_, i) => {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        return d.toLocaleDateString('en-CA');
+    }).reverse();
+
+    const attendanceByDay = last7Days.map(date => {
+        const records = mockAttendance.filter(a => new Date(a.date).toLocaleDateString('en-CA') === date);
+        const present = records.filter(r => r.status === 'present' || r.status === 'late').length;
+        const absent = records.filter(r => r.status === 'absent').length;
+        return {
+            date: new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+            Present: present,
+            Absent: absent
+        };
+    });
+
+    return (
+        <>
+            <PageHeader
+                title="Admin Dashboard"
+                description="Overview of the school's attendance and academic status."
+            />
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                <StatCard title="Total Sale" value="3,256" icon={Users} description="+15% from last month" color="bg-blue-500" />
+                <StatCard title="Last Month Sale" value="6,257" icon={BookCheck} description="+20% from last month" color="bg-green-500" />
+                <StatCard title="Total Revenue" value="$34,650" icon={Wallet} description="+8% from last month" color="bg-purple-500" />
+                <StatCard title="Total Email Sent" value="11,320" icon={Send} description="-2% from last month" color="bg-gray-700" />
+            </div>
+            <div className="grid gap-4 mt-6">
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                            <BarChartHorizontal className="h-5 w-5" />
+                            Sale Statistics
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="pl-2">
+                        <ResponsiveContainer width="100%" height={350}>
+                            <BarChart data={attendanceByDay}>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                                <XAxis
+                                    dataKey="date"
+                                    stroke="#888888"
+                                    fontSize={12}
+                                    tickLine={false}
+                                    axisLine={false}
+                                />
+                                <YAxis
+                                    stroke="#888888"
+                                    fontSize={12}
+                                    tickLine={false}
+                                    axisLine={false}
+                                    tickFormatter={(value) => `${value}`}
+                                />
+                                <Tooltip
+                                    contentStyle={{
+                                        backgroundColor: 'hsl(var(--background))',
+                                        border: '1px solid hsl(var(--border))',
+                                        borderRadius: 'var(--radius)'
+                                    }}
+                                />
+                                <Legend wrapperStyle={{fontSize: "12px"}} />
+                                <Bar dataKey="Present" fill="hsl(var(--chart-1))" radius={[4, 4, 0, 0]} barSize={20} />
+                                <Bar dataKey="Absent" fill="hsl(var(--chart-2))" radius={[4, 4, 0, 0]} barSize={20} />
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </CardContent>
+                </Card>
+            </div>
+        </>
+    );
 }

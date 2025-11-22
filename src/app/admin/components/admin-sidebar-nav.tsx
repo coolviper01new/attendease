@@ -5,6 +5,8 @@ import {
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
+  SidebarGroup,
+  SidebarGroupLabel
 } from "@/components/ui/sidebar";
 import { LayoutDashboard, Book, BarChart3, Users, Building, Calendar, GraduationCap } from "lucide-react";
 
@@ -22,23 +24,24 @@ export function AdminSidebarNav() {
   const pathname = usePathname();
 
   return (
-    <SidebarContent className="p-2">
-      <SidebarMenu>
-        {links.map((link) => (
-          <SidebarMenuItem key={link.href}>
-            <SidebarMenuButton
-              asChild
-              isActive={pathname === link.href}
-              tooltip={link.label}
-            >
-              <a href={link.href}>
-                <link.icon />
-                <span>{link.label}</span>
-              </a>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        ))}
-      </SidebarMenu>
-    </SidebarContent>
+      <SidebarGroup>
+        <SidebarGroupLabel className="!text-xs !font-semibold">APPLICATION</SidebarGroupLabel>
+        <SidebarMenu>
+            {links.map((link) => (
+            <SidebarMenuItem key={link.href}>
+                <SidebarMenuButton
+                asChild
+                isActive={pathname === link.href}
+                tooltip={link.label}
+                >
+                <a href={link.href}>
+                    <link.icon />
+                    <span>{link.label}</span>
+                </a>
+                </SidebarMenuButton>
+            </SidebarMenuItem>
+            ))}
+        </SidebarMenu>
+      </SidebarGroup>
   );
 }
