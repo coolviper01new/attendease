@@ -17,7 +17,7 @@
  *   (like subjects and school years) is stored in top-level collections for broader read access.
  * - Key Security Decisions:
  *   - User profile data is private; users can only access their own document.
- *   - Listing all users is explicitly disallowed to protect user privacy.
+ *   - Listing all users is explicitly disallowed to protect user privacy, except for admins.
  *   - Academic data (`schoolYears`, `subjects`, etc.) is read-only for all signed-in users but
  *     can only be modified by users with the 'admin' role.
  *   - Students can create their own attendance records but cannot view, edit, or delete the records
@@ -86,13 +86,13 @@ service cloud.firestore {
      * @path /users/{userId}
      * @allow (create) A new user can create their own profile document.
      * @deny (get) A user cannot read another user's profile.
-     * @deny (list) Listing all users is forbidden.
+     * @allow (list) Listing all users is allowed only for admins.
      * @deny (update) A user cannot change their assigned role.
      * @principle Restricts access to a user's own data tree and ensures role immutability.
      */
     match /users/{userId} {
       allow get: if isOwner(userId) || isAdmin();
-      allow list: if false;
+      allow list: if isAdmin();
       allow create: if isOwner(userId) && request.resource.data.id == userId;
       allow update: if (isOwner(userId) || isAdmin()) && isExistingDoc() && request.resource.data.id == resource.data.id && request.resource.data.role == resource.data.role;
       allow delete: if isAdmin() && isExistingDoc();
