@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -25,11 +24,10 @@ import {
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 import { useUser, useFirestore, useDoc, useCollection, useMemoFirebase } from '@/firebase';
-import { doc, collection, query, where, getDocs, updateDoc } from 'firebase/firestore';
-import type { Student, Subject, Registration, Schedule } from '@/lib/types';
+import { doc, collection, query, where, getDocs, updateDoc, getDoc } from 'firebase/firestore';
+import type { Student, Subject, Registration, Schedule, AttendanceSession } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
-import { cn } from '@/lib/utils';
 
 const QrCodeDialog = ({
   studentId,
@@ -37,12 +35,14 @@ const QrCodeDialog = ({
   isDeviceRegistered,
   isCurrentDevice,
   onRegister,
+  activeSession,
 }: {
   studentId: string;
   subject: Subject;
   isDeviceRegistered: boolean;
   isCurrentDevice: boolean;
   onRegister: () => void;
+  activeSession?: AttendanceSession;
 }) => {
   if (!isDeviceRegistered) {
     return (
@@ -64,8 +64,19 @@ const QrCodeDialog = ({
     );
   }
 
-  const qrCodeSecret = 'supersecretkey'; // This should be unique per session in a real app
-  const qrData = JSON.stringify({ studentId, subjectId: subject.id, qrCodeSecret });
+  if (!activeSession) {
+     return (
+      <Alert className="mt-4 text-center">
+        <AlertTriangle className="h-4 w-4" />
+        <AlertTitle>No Active Session</AlertTitle>
+        <AlertDescription>
+          There is no active attendance session for this subject right now.
+        </AlertDescription>
+      </Alert>
+    );
+  }
+
+  const qrData = JSON.stringify({ studentId, subjectId: subject.id, qrCodeSecret: activeSession.qrCodeSecret });
   const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(
     qrData
   )}`;
@@ -107,6 +118,12 @@ const SubjectCard = ({ subject, student, isClient, isDeviceRegistered, isCurrent
     onRegisterDevice: () => void;
     isToday?: boolean;
 }) => {
+    const firestore = useFirestore();
+    const activeSessionQuery = useMemoFirebase(() => 
+        query(collection(firestore, 'subjects', subject.id, 'attendanceSessions'), where('isActive', '==', true))
+    , [firestore, subject.id]);
+    const { data: activeSessions } = useCollection<AttendanceSession>(activeSessionQuery);
+    const activeSession = activeSessions?.[0];
 
     const getTodaySchedules = (schedules: Schedule[] = [], day: string) => {
         return schedules.filter(sc => sc.day === day);
@@ -161,6 +178,7 @@ const SubjectCard = ({ subject, student, isClient, isDeviceRegistered, isCurrent
                   isDeviceRegistered={isDeviceRegistered}
                   isCurrentDevice={isCurrentDevice}
                   onRegister={onRegisterDevice}
+                  activeSession={activeSession}
                 />
               )}
             </CardFooter>
@@ -305,9 +323,9 @@ export default function StudentDashboardPage() {
         <Alert className="mb-6 bg-blue-500/10 border-blue-500/20 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300 dark:border-blue-900">
           <Info className="h-4 w-4" />
           <AlertTitle>Device Registration Required</AlertTitle>
-          <AlertDescription>
+          <AlertDescription className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
             To generate QR codes for attendance, you must register your primary device. This is a one-time action.
-            <Button onClick={handleRegisterDevice} size="sm" className="mt-2 w-full sm:w-auto">Register This Device</Button>
+            <Button onClick={handleRegisterDevice} size="sm" className="mt-2 sm:mt-0 sm:ml-4 w-full sm:w-auto">Register This Device</Button>
           </AlertDescription>
         </Alert>
       )}
@@ -373,3 +391,5 @@ export default function StudentDashboardPage() {
     </>
   );
 }
+
+    

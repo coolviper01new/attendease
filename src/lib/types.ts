@@ -1,8 +1,3 @@
-
-
-
-
-
 export type SchoolYear = {
   id: string;
   name: string;
@@ -64,8 +59,9 @@ export type AttendanceSession = {
   id: string;
   subjectId: string;
   isActive: boolean;
-  activationTime?: string;
-  deactivationTime?: string;
+  startTime: any;
+  endTime?: any;
+  qrCodeSecret: string;
 };
 
 export type AttendanceStatus = 'present' | 'absent' | 'late';
@@ -77,6 +73,7 @@ export type Attendance = {
   date: string;
   status: AttendanceStatus;
   recordedBy: string; // adminId
+  timestamp: any;
 };
 
 export type Warning = {
