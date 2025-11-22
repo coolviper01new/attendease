@@ -46,9 +46,10 @@ export default function SubjectAttendancePage() {
   const [areStudentsLoading, setAreStudentsLoading] = useState(true);
 
   useEffect(() => {
+    let isMounted = true;
     const fetchStudents = async () => {
       if (registrations && registrations.length > 0) {
-        setAreStudentsLoading(true);
+        if (isMounted) setAreStudentsLoading(true);
         const studentIds = registrations.map(reg => reg.studentId);
         
         const studentChunks: string[][] = [];
@@ -61,6 +62,8 @@ export default function SubjectAttendancePage() {
         );
 
         const studentSnapshots = await Promise.all(studentPromises);
+        if (!isMounted) return;
+
         const students = studentSnapshots.flatMap(snapshot => 
             snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Student & {id: string}))
         );
@@ -69,11 +72,17 @@ export default function SubjectAttendancePage() {
         setAreStudentsLoading(false);
 
       } else if (!areRegistrationsLoading) {
-        setRegisteredStudents([]);
-        setAreStudentsLoading(false);
+        if (isMounted) {
+          setRegisteredStudents([]);
+          setAreStudentsLoading(false);
+        }
       }
     };
     fetchStudents();
+    
+    return () => {
+      isMounted = false;
+    };
   }, [registrations, areRegistrationsLoading, firestore]);
   
 
