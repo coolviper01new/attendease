@@ -402,11 +402,14 @@ export function AttendanceScannerDialog({
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => {
-        // Stop session only if it was active when dialog is closed
-        if (!isOpen && activeSession) {
-            handleStopSession();
+        if (!isOpen) {
+             if (activeSession) {
+                handleStopSession();
+            }
+            onOpenChange(false);
+        } else {
+            onOpenChange(true);
         }
-        onOpenChange(isOpen);
     }}>
       <DialogContent className="max-w-6xl h-[90vh]">
         <DialogHeader className="text-center">
