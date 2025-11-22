@@ -30,7 +30,7 @@ import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { validateAttendance } from "@/ai/flows/attendance-validator";
 
 // A library to decode QR codes from a video stream
-import { QrScanner } from 'qr-scanner';
+import QrScanner from 'qr-scanner';
 
 
 export default function SubjectAttendancePage() {
@@ -336,5 +336,3 @@ export default function SubjectAttendancePage() {
     </>
   );
 }
-
-    
