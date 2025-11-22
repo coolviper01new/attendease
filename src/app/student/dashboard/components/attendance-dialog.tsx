@@ -1,6 +1,6 @@
-
 'use client';
 
+import { useMemo } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -42,16 +42,23 @@ export function AttendanceDialog({
 
   const attendanceQuery = useMemoFirebase(() => {
     if (!student) return null;
+    // Query is simplified to only what is allowed by security rules for students.
+    // Filtering by subject will happen on the client side.
     return query(
       collectionGroup(firestore, 'attendance'),
       where('studentId', '==', student.id),
-      where('subjectId', '==', subject.id),
       orderBy('timestamp', 'desc')
     );
-  }, [firestore, student, subject]);
+  }, [firestore, student]);
 
-  const { data: attendanceRecords, isLoading } =
+  const { data: allAttendanceRecords, isLoading } =
     useCollection<Attendance>(attendanceQuery);
+
+  const subjectAttendanceRecords = useMemo(() => {
+    if (!allAttendanceRecords) return [];
+    return allAttendanceRecords.filter(rec => rec.subjectId === subject.id);
+  }, [allAttendanceRecords, subject.id]);
+
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -85,37 +92,39 @@ export function AttendanceDialog({
                     Loading attendance...
                   </TableCell>
                 </TableRow>
-              ) : attendanceRecords && attendanceRecords.length > 0 ? (
-                attendanceRecords.map((record) => (
+              ) : subjectAttendanceRecords && subjectAttendanceRecords.length > 0 ? (
+                subjectAttendanceRecords.map((record) => (
                   <TableRow key={record.id}>
                     <TableCell>
-                      {new Date(record.date).toLocaleDateString('en-US', {
+                      {record.date ? new Date(record.date).toLocaleDateString('en-US', {
                         year: 'numeric',
                         month: 'long',
                         day: 'numeric',
-                      })}
+                      }) : 'N/A'}
                     </TableCell>
                     <TableCell className="text-center">
-                      <Badge
-                        variant={
-                          record.status === 'present'
-                            ? 'default'
-                            : record.status === 'absent'
-                            ? 'destructive'
-                            : 'secondary'
-                        }
-                        className={cn(
-                          'capitalize',
-                          record.status === 'present' &&
-                            'bg-green-600/10 text-green-700 border-green-600/20 hover:bg-green-600/20',
-                          record.status === 'absent' &&
-                            'bg-destructive/10 text-destructive border-destructive/20 hover:bg-destructive/20',
-                          record.status === 'late' &&
-                            'bg-yellow-500/10 text-yellow-600 border-yellow-500/20 hover:bg-yellow-500/20'
-                        )}
-                      >
-                        {record.status}
-                      </Badge>
+                     {record.status ? (
+                        <Badge
+                          variant={
+                            record.status === 'present'
+                              ? 'default'
+                              : record.status === 'absent'
+                              ? 'destructive'
+                              : 'secondary'
+                          }
+                          className={cn(
+                            'capitalize',
+                            record.status === 'present' &&
+                              'bg-green-600/10 text-green-700 border-green-600/20 hover:bg-green-600/20',
+                            record.status === 'absent' &&
+                              'bg-destructive/10 text-destructive border-destructive/20 hover:bg-destructive/20',
+                            record.status === 'late' &&
+                              'bg-yellow-500/10 text-yellow-600 border-yellow-500/20 hover:bg-yellow-500/20'
+                          )}
+                        >
+                          {record.status}
+                        </Badge>
+                      ) : 'N/A'}
                     </TableCell>
                   </TableRow>
                 ))
@@ -136,5 +145,3 @@ export function AttendanceDialog({
     </Dialog>
   );
 }
-
-    

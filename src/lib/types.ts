@@ -1,6 +1,7 @@
 
 
 
+
 export type SchoolYear = {
   id: string;
   name: string;
@@ -74,10 +75,10 @@ export type Attendance = {
   id:string;
   studentId: string;
   subjectId: string;
-  timestamp: any;
+  timestamp: any; // Firestore Timestamp
   status: AttendanceStatus;
   recordedBy: string; // adminId
-  date: string;
+  date: string; // ISO String
 };
 
 export type Warning = {
