@@ -47,6 +47,8 @@ import type {
   Attendance,
   Student,
 } from '@/lib/types';
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError } from '@/firebase/errors';
 
 interface AttendanceScannerDialogProps {
   subject: Subject;
@@ -225,7 +227,17 @@ export function AttendanceScannerDialog({
       }
       
       const studentRegQuery = query(collectionGroup(firestore, 'registrations'), where('studentId', '==', qrData.studentId), where('subjectId', '==', subject.id));
-      const studentRegSnapshot = await getDocs(studentRegQuery);
+      
+      const studentRegSnapshot = await getDocs(studentRegQuery).catch(serverError => {
+        const permissionError = new FirestorePermissionError({
+            path: 'registrations', // Path for a collection group query
+            operation: 'list',
+        });
+        errorEmitter.emit('permission-error', permissionError);
+        // Re-throw to stop execution in the main try-block
+        throw permissionError;
+      });
+
       const isRegistered = !studentRegSnapshot.empty;
 
       const validationInput = {
@@ -265,13 +277,16 @@ export function AttendanceScannerDialog({
           description: result.reason || 'Could not validate attendance.',
         });
       }
-    } catch (error) {
-      console.error('Error processing QR code:', error);
-      toast({
-        variant: 'destructive',
-        title: 'Scan Error',
-        description: 'The scanned QR code is not valid for this system.',
-      });
+    } catch (error: any) {
+        // This will catch the re-thrown permission error or other parsing/validation errors
+        if (error.name !== 'FirebaseError') {
+          console.error('Error processing QR code:', error);
+          toast({
+            variant: 'destructive',
+            title: 'Scan Error',
+            description: 'The scanned QR code is not valid for this system.',
+          });
+        }
     } finally {
       setTimeout(() => {
         setIsProcessing(false);
