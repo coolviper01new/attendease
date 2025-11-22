@@ -91,7 +91,7 @@ const ScheduleArray = ({ control, name, label, description, isLab = false }: { c
         const currentDayOrder = daysOfWeek.indexOf(currentDay);
         
         let sourceIndex = -1;
-        // Find the index of the previously checked day
+        // Find the index of the most recently checked day before the current one
         for (let i = currentDayOrder - 1; i >= 0; i--) {
             const prevDay = daysOfWeek[i];
             const foundIndex = fields.findIndex(field => (field as any).day === prevDay);
@@ -110,13 +110,11 @@ const ScheduleArray = ({ control, name, label, description, isLab = false }: { c
           return;
         }
       
-        // Get the values from the source day
         const sourceSchedule = control.getValues(`${name}.${sourceIndex}`);
         if (!sourceSchedule) return;
       
         const { startTime, endTime, room } = sourceSchedule;
       
-        // Update the target day with the source values
         update(targetIndex, { ...(fields[targetIndex] as any), startTime, endTime, room });
 
         toast({
@@ -478,5 +476,3 @@ export function AddSubjectForm({ onSuccess, subject }: AddSubjectFormProps) {
     </Form>
   );
 }
-
-    
