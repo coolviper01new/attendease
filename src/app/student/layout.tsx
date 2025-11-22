@@ -1,7 +1,7 @@
 
 'use client';
 import Link from 'next/link';
-import { useMemo, useEffect } from 'react';
+import { useMemo, useEffect, useState } from 'react';
 import { AppWindow, User, LogOut, BookUser, CheckSquare, QrCode, SmartphoneNfc } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -22,23 +22,53 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { signOut } from 'firebase/auth';
 import { useAuth } from '@/firebase';
 import type { Student } from '@/lib/types';
-import { doc, updateDoc } from 'firebase/firestore';
+import { doc, serverTimestamp, updateDoc } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
+import { Dialog, DialogHeader, DialogTitle, DialogDescription, DialogContent, DialogFooter, DialogClose } from '@/components/ui/dialog';
+
+const DeregistrationDialog = ({ onConfirm }: { onConfirm: () => void }) => {
+  return (
+    <AlertDialog>
+      <AlertDialogTrigger asChild>
+        <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+          <SmartphoneNfc className="mr-2 h-4 w-4" />
+          <span>Request Deregistration</span>
+        </DropdownMenuItem>
+      </AlertDialogTrigger>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Request Device Deregistration?</AlertDialogTitle>
+          <AlertDialogDescription>
+            This will generate a one-time code that you must provide to your teacher to complete the process. Your current device will remain registered until the request is approved.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction onClick={onConfirm}>
+            Generate Code
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+};
+
 
 function StudentHeader() {
   const { user, isUserLoading } = useUser();
   const auth = useAuth();
   const firestore = useFirestore();
   const router = useRouter();
+
+  const [deregCode, setDeregCode] = useState<string | null>(null);
 
   const userDocRef = useMemoFirebase(() => {
     if (!user) return null;
@@ -51,21 +81,51 @@ function StudentHeader() {
     router.push('/login');
   };
 
-  const handleRemoveDeviceRegistration = async () => {
+  const handleRequestDeregistration = async () => {
     if (!userDocRef) return;
-    const deviceData = { deviceId: null };
-    updateDoc(userDocRef, deviceData).catch(error => {
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    const updateData = {
+      deregistrationCode: code,
+      deregistrationRequestedAt: serverTimestamp(),
+    };
+
+    try {
+      await updateDoc(userDocRef, updateData);
+      setDeregCode(code);
+    } catch (error) {
       errorEmitter.emit('permission-error', new FirestorePermissionError({
         path: userDocRef.path,
         operation: 'update',
-        requestResourceData: deviceData
-      }))
-    })
-  }
+        requestResourceData: updateData,
+      }));
+    }
+  };
 
   const isLoading = isUserLoading || isStudentLoading;
 
   return (
+    <>
+    <Dialog open={!!deregCode} onOpenChange={(open) => !open && setDeregCode(null)}>
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>Deregistration Code Generated</DialogTitle>
+                <DialogDescription>
+                    Please provide this code to your teacher to finalize your device deregistration request. This code is valid for a limited time.
+                </DialogDescription>
+            </DialogHeader>
+            <div className="py-4">
+                <p className="text-center text-5xl font-mono tracking-widest font-bold text-primary bg-primary/10 py-4 rounded-lg">
+                    {deregCode}
+                </p>
+            </div>
+            <DialogFooter>
+                <DialogClose asChild>
+                    <Button>Close</Button>
+                </DialogClose>
+            </DialogFooter>
+        </DialogContent>
+    </Dialog>
+
     <header className="sticky top-0 z-40 w-full border-b border-border/70 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-16 items-center">
         <div className="mr-4 flex">
@@ -129,28 +189,7 @@ function StudentHeader() {
                   <span>Profile</span>
                 </DropdownMenuItem>
                  {student?.deviceId && (
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-                        <SmartphoneNfc className="mr-2 h-4 w-4" />
-                        <span>Remove Device</span>
-                      </DropdownMenuItem>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          This will remove the registration from your current device. You will need to register a device again to generate QR codes for attendance.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleRemoveDeviceRegistration}>
-                          Confirm & Remove
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
+                  <DeregistrationDialog onConfirm={handleRequestDeregistration} />
                 )}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleLogout}>
@@ -163,6 +202,7 @@ function StudentHeader() {
         </div>
       </div>
     </header>
+    </>
   );
 }
 
@@ -197,3 +237,5 @@ export default function StudentLayout({
     </div>
   );
 }
+
+    

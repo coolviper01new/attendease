@@ -1,5 +1,6 @@
 
 
+
 export type SchoolYear = {
   id: string;
   name: string;
@@ -103,6 +104,8 @@ export type Student = User & {
   course: string;
   deviceId?: string;
   name: string;
+  deregistrationCode?: string;
+  deregistrationRequestedAt?: any;
 };
 
 export type Admin = User & {
@@ -110,5 +113,7 @@ export type Admin = User & {
   facultyId: string;
   name: string;
 };
+
+    
 
     
