@@ -151,7 +151,7 @@ const SubjectCard = ({ subject, student, isClient, isDeviceRegistered, isCurrent
             setIsQrDialogOpen(false); // Close QR dialog on confirmation
             setCountdown(5);
         }
-    }, [isPresent, isConfirmed]);
+    }, [isPresent, isConfirmed, activeSession]);
 
     useEffect(() => {
         let timer: NodeJS.Timeout;
