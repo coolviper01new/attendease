@@ -284,7 +284,7 @@ const ActionsCell = ({ row, onEdit, onRefresh }: { row: any, onEdit: (subject: S
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
-              <Link href={`/admin/subjects/${subject.id}`}>View Attendance</Link>
+              <Link href={`/attendance/${subject.id}`} target="_blank">View Attendance</Link>
             </DropdownMenuItem>
              <DeleteSubjectAction subject={subject} onDeleted={onRefresh} />
           </DropdownMenuContent>
@@ -312,7 +312,7 @@ export const getColumns = ({ onEdit, onRefresh }: GetColumnsProps): ColumnDef<Su
         {row.getIsGrouped() ? (
           <div className="font-bold">{row.getValue("name")}</div>
         ) : (
-          <Link href={`/admin/subjects/${row.original.id}`} className="hover:underline">
+          <Link href={`/attendance/${row.original.id}`} className="hover:underline" target="_blank">
             <div className="font-medium">{row.original.name}</div>
             <div className="text-xs text-muted-foreground">{row.original.code}</div>
           </Link>
@@ -404,3 +404,5 @@ export const getColumns = ({ onEdit, onRefresh }: GetColumnsProps): ColumnDef<Su
     cell: (props) => <ActionsCell {...props} onEdit={onEdit} onRefresh={onRefresh} />,
   },
 ];
+
+    
