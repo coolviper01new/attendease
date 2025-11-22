@@ -77,6 +77,23 @@ service cloud.firestore {
 
     /*********************************************************************
      *                                                                   *
+     *                     COLLECTION GROUP RULES                        *
+     *                                                                   *
+     *********************************************************************/
+
+    /**
+     * @description Governs collection group queries.
+     * @path /{path=**}/registrations/{registrationId}
+     * @allow (list) Allows admins to perform collection group queries on `registrations`.
+     *               This is required for the attendance scanner to verify student enrollment.
+     */
+    match /{path=**}/registrations/{registrationId} {
+      allow list: if isAdmin();
+    }
+
+
+    /*********************************************************************
+     *                                                                   *
      *                      USER DATA RULES                              *
      *                                                                   *
      *********************************************************************/
