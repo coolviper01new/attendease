@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useForm, useFieldArray, Controller } from 'react-hook-form';
+import { useForm, useFieldArray, Controller, UseFormSetValue } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
@@ -74,7 +74,7 @@ interface AddSubjectFormProps {
   subject?: Subject | null;
 }
 
-const ScheduleArray = ({ control, name, label, description }: { control: any, name: "lectureSchedules" | "labSchedules", label: string, description: string }) => {
+const ScheduleArray = ({ control, setValue, name, label, description }: { control: any, setValue: UseFormSetValue<SubjectFormValues>, name: "lectureSchedules" | "labSchedules", label: string, description: string }) => {
     const { fields, append, remove, update } = useFieldArray({ control, name });
     const [alert, setAlert] = useState<{variant: 'default' | 'destructive', title: string, description: string} | null>(null);
 
@@ -191,7 +191,7 @@ const ScheduleArray = ({ control, name, label, description }: { control: any, na
                                 {...field}
                                 onBlur={(e) => {
                                   field.onBlur();
-                                  control.setValue(`${name}.${fieldIndex}.room`, e.target.value.toUpperCase());
+                                  setValue(`${name}.${fieldIndex}.room`, e.target.value.toUpperCase());
                                 }}
                               />
                             </FormControl>
@@ -442,6 +442,7 @@ export function AddSubjectForm({ onSuccess, subject }: AddSubjectFormProps) {
         <div className="space-y-4">
             <ScheduleArray 
                 control={form.control}
+                setValue={form.setValue}
                 name="lectureSchedules"
                 label="Lecture Schedule"
                 description="Select the days and times for lecture classes."
@@ -471,6 +472,7 @@ export function AddSubjectForm({ onSuccess, subject }: AddSubjectFormProps) {
             {hasLab && (
                  <ScheduleArray 
                     control={form.control}
+                    setValue={form.setValue}
                     name="labSchedules"
                     label="Laboratory Schedule"
                     description="Select the days and times for laboratory classes."
