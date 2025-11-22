@@ -73,7 +73,7 @@ interface AddSubjectFormProps {
   subject?: Subject | null;
 }
 
-const ScheduleArray = ({ control, name, label, description, isLab = false }: { control: any, name: "lectureSchedules" | "labSchedules", label: string, description: string, isLab?: boolean }) => {
+const ScheduleArray = ({ control, name, label, description }: { control: any, name: "lectureSchedules" | "labSchedules", label: string, description: string }) => {
     const { fields, append, remove, update } = useFieldArray({ control, name });
     const { toast } = useToast();
 
@@ -91,12 +91,15 @@ const ScheduleArray = ({ control, name, label, description, isLab = false }: { c
         const currentDayOrder = daysOfWeek.indexOf(currentDay);
         
         let sourceIndex = -1;
+        let sourceDay = '';
+
         // Find the index of the most recently checked day before the current one
         for (let i = currentDayOrder - 1; i >= 0; i--) {
             const prevDay = daysOfWeek[i];
             const foundIndex = fields.findIndex(field => (field as any).day === prevDay);
             if (foundIndex > -1) {
                 sourceIndex = foundIndex;
+                sourceDay = prevDay;
                 break;
             }
         }
@@ -119,7 +122,7 @@ const ScheduleArray = ({ control, name, label, description, isLab = false }: { c
 
         toast({
           title: 'Schedule Copied',
-          description: `Schedule from ${daysOfWeek[sourceIndex]} has been copied to ${currentDay}.`,
+          description: `Schedule from ${sourceDay} has been copied to ${currentDay}.`,
         });
     };
 
@@ -463,7 +466,6 @@ export function AddSubjectForm({ onSuccess, subject }: AddSubjectFormProps) {
                     name="labSchedules"
                     label="Laboratory Schedule"
                     description="Select the days and times for laboratory classes."
-                    isLab
                 />
             )}
         </div>
@@ -476,5 +478,3 @@ export function AddSubjectForm({ onSuccess, subject }: AddSubjectFormProps) {
     </Form>
   );
 }
-
-    
