@@ -22,8 +22,8 @@ export function Header() {
           <nav className="flex items-center space-x-2">
              <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="relative h-8 w-8 rounded-full">
-                  <Avatar className="h-9 w-9">
+                <Button variant="ghost" className="relative h-10 w-10 rounded-full">
+                  <Avatar className="h-10 w-10">
                     <AvatarImage src={mockAdmin.avatarUrl} alt={mockAdmin.name} />
                     <AvatarFallback>{mockAdmin.name.charAt(0)}</AvatarFallback>
                   </Avatar>

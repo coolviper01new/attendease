@@ -30,8 +30,8 @@ export default function AdminDashboardPage() {
     return (
         <>
             <PageHeader
-                title="Admin Dashboard"
-                description="Overview of the school's attendance and academic status."
+                title="Dashboard"
+                description="An overview of your sales and performance."
             />
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                 <StatCard title="Total Sale" value="3,256" icon={Users} description="+15% from last month" color="bg-blue-500" />
@@ -42,7 +42,7 @@ export default function AdminDashboardPage() {
             <div className="grid gap-4 mt-6">
                 <Card>
                     <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
+                        <CardTitle className="flex items-center gap-2 font-headline text-xl">
                             <BarChartHorizontal className="h-5 w-5" />
                             Sale Statistics
                         </CardTitle>
