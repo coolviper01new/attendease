@@ -27,7 +27,7 @@ import { useFirestore } from '@/firebase';
 import { addDoc, collection } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Checkbox } from '@/components/ui/checkbox';
-import { X } from 'lucide-react';
+import { Copy } from 'lucide-react';
 
 const schoolYearRegex = /^\d{4}-\d{4}$/;
 
@@ -68,7 +68,7 @@ export function AddSubjectForm({ onSuccess }: AddSubjectFormProps) {
     },
   });
 
-  const { fields, append, remove } = useFieldArray({
+  const { fields, append, remove, update } = useFieldArray({
     control: form.control,
     name: 'schedules',
   });
@@ -82,6 +82,29 @@ export function AddSubjectForm({ onSuccess }: AddSubjectFormProps) {
         remove(indexToRemove);
       }
     }
+  };
+
+  const handleCopySchedule = (sourceIndex: number) => {
+    const sourceSchedule = form.getValues(`schedules.${sourceIndex}`);
+    if (!sourceSchedule) return;
+
+    const { startTime, endTime, room } = sourceSchedule;
+
+    fields.forEach((field, index) => {
+      if (index !== sourceIndex) { // Don't update the source
+        update(index, {
+          ...field, // Keep the day
+          startTime,
+          endTime,
+          room,
+        });
+      }
+    });
+
+    toast({
+        title: "Schedule Copied",
+        description: "The time and room have been copied to all other selected days.",
+    });
   };
 
   const onSubmit = async (values: SubjectFormValues) => {
@@ -231,7 +254,7 @@ export function AddSubjectForm({ onSuccess }: AddSubjectFormProps) {
                     </label>
                   </div>
                   {isChecked && (
-                    <div className="grid grid-cols-3 gap-2 mt-2 pl-6">
+                    <div className="grid grid-cols-[1fr_1fr_1fr_auto] gap-2 mt-2 pl-6 items-center">
                       <FormField
                         control={form.control}
                         name={`schedules.${fieldIndex}.startTime`}
@@ -268,6 +291,15 @@ export function AddSubjectForm({ onSuccess }: AddSubjectFormProps) {
                           </FormItem>
                         )}
                       />
+                       <Button 
+                        type="button" 
+                        variant="ghost" 
+                        size="icon"
+                        onClick={() => handleCopySchedule(fieldIndex)}
+                        aria-label="Copy schedule to all other checked days"
+                      >
+                        <Copy className="h-4 w-4" />
+                      </Button>
                     </div>
                   )}
                 </div>
