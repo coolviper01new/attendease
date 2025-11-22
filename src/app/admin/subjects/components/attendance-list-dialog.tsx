@@ -18,7 +18,7 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, query, where, orderBy, collectionGroup, getDocs } from 'firebase/firestore';
+import { collection, query, where, orderBy, getDocs, collectionGroup } from 'firebase/firestore';
 import type { Subject, Student, Attendance, Registration, AttendanceSession } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
@@ -78,13 +78,36 @@ export function AttendanceListDialog({
         try {
             // 3. Get all students registered for this subject
             const registrationsQuery = query(collectionGroup(firestore, 'registrations'), where('subjectId', '==', subject.id));
-            const registrationsSnapshot = await getDocs(registrationsQuery);
+            const registrationsSnapshot = await getDocs(registrationsQuery).catch(e => {
+                const error = e as any;
+                if (error?.code === 'permission-denied') {
+                    const permissionError = new FirestorePermissionError({
+                        path: 'registrations', // path for collection group query
+                        operation: 'list'
+                    });
+                    errorEmitter.emit('permission-error', permissionError);
+                }
+                throw e; // re-throw to stop execution
+            });
+            
             const studentIds = registrationsSnapshot.docs.map(doc => (doc.data() as Registration).studentId);
 
             if (studentIds.length > 0) {
-                const studentsQuery = query(collection(firestore, 'users'), where('__name__', 'in', studentIds));
-                const studentsSnapshot = await getDocs(studentsQuery);
-                const enrolledStudents = studentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Student & { id: string }));
+                 const studentChunks: string[][] = [];
+                for (let i = 0; i < studentIds.length; i += 10) {
+                    studentChunks.push(studentIds.slice(i, i + 10));
+                }
+
+                const studentPromises = studentChunks.map(chunk => 
+                    getDocs(query(collection(firestore, 'users'), where('__name__', 'in', chunk)))
+                );
+                
+                const studentSnapshots = await Promise.all(studentPromises);
+
+                const enrolledStudents = studentSnapshots.flatMap(snapshot => 
+                    snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Student & { id: string }))
+                );
+
 
                 // 4. Combine the lists
                 const presentStudentIds = new Set(attendanceRecords?.map(rec => rec.studentId));
@@ -111,14 +134,8 @@ export function AttendanceListDialog({
             }
         } catch(e) {
             const error = e as any;
-             if (error?.code === 'permission-denied') {
-                const permissionError = new FirestorePermissionError({
-                    path: `registrations`,
-                    operation: 'list',
-                });
-                errorEmitter.emit('permission-error', permissionError);
-            } else {
-                console.error("An unexpected error occurred in AttendanceListDialog:", error);
+            if (error?.code !== 'permission-denied') { // only log if not already handled
+                 console.error("An unexpected error occurred in AttendanceListDialog:", error);
             }
         } finally {
             setIsLoading(false);

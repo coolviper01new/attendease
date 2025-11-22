@@ -93,9 +93,9 @@ service cloud.firestore {
         allow list: if isSignedIn() && request.query.where.studentId == request.auth.uid
                     || (isAdmin() && request.query.where.subjectId is string && request.query.where.date is string);
     }
-    
+
     match /{path=**}/registrations/{registrationId} {
-      allow list: if isAdmin() && request.query.where.subjectId is string;
+        allow list: if isAdmin() && request.query.where.subjectId is string;
     }
 
 
@@ -226,7 +226,7 @@ service cloud.firestore {
      */
     match /subjects/{subjectId}/attendanceSessions/{attendanceSessionId} {
       allow get: if isSignedIn();
-      allow list: if isAdmin();
+      allow list: if isAdmin() && request.query.where.isActive == true;
       allow create: if isAdmin();
       allow update, delete: if isAdmin() && isExistingDoc();
 
