@@ -7,10 +7,12 @@ import { Download } from "lucide-react";
 import { AttendanceReportClient } from "./components/attendance-report-client";
 import { WarningsReportClient } from "./components/warnings-report-client";
 import { Card, CardContent } from "@/components/ui/card";
-import { useCollection, useFirestore } from "@/firebase";
+import { useFirestore } from "@/firebase";
 import { collection, collectionGroup, getDocs, query } from "firebase/firestore";
 import { useMemo, useEffect, useState } from "react";
 import type { Attendance, Subject, User, Warning } from "@/lib/types";
+import { FirestorePermissionError } from "@/firebase/errors";
+import { errorEmitter } from "@/firebase/error-emitter";
 
 export default function AdminReportsPage() {
     const firestore = useFirestore();
@@ -23,54 +25,64 @@ export default function AdminReportsPage() {
         const fetchData = async () => {
             if (!isMounted) return;
             setIsLoading(true);
-            try {
-                // Fetch all data
-                const studentsSnapshot = await getDocs(collection(firestore, 'users'));
-                const subjectsSnapshot = await getDocs(collection(firestore, 'subjects'));
-                const attendanceSnapshot = await getDocs(query(collectionGroup(firestore, 'attendance')));
-                const warningsSnapshot = await getDocs(query(collectionGroup(firestore, 'warnings')));
+            
+            const studentsQuery = query(collection(firestore, 'users'));
+            const subjectsQuery = query(collection(firestore, 'subjects'));
+            const attendanceQuery = query(collectionGroup(firestore, 'attendance'));
+            const warningsQuery = query(collectionGroup(firestore, 'warnings'));
 
-                if (!isMounted) return;
+            const handlePermissionError = (operation: 'list', path: string) => {
+                const permissionError = new FirestorePermissionError({ path, operation });
+                errorEmitter.emit('permission-error', permissionError);
+            };
 
-                const students = studentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as (User & {id: string, name: string})[];
-                const subjects = subjectsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as (Subject & {id: string})[];
-                const attendance = attendanceSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as (Attendance & {id: string})[];
-                const warnings = warningsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as (Warning & {id: string})[];
+            const [studentsSnapshot, subjectsSnapshot, attendanceSnapshot, warningsSnapshot] = await Promise.all([
+                getDocs(studentsQuery).catch(err => { handlePermissionError('list', 'users'); return null; }),
+                getDocs(subjectsQuery).catch(err => { handlePermissionError('list', 'subjects'); return null; }),
+                getDocs(attendanceQuery).catch(err => { handlePermissionError('list', 'attendance'); return null; }),
+                getDocs(warningsQuery).catch(err => { handlePermissionError('list', 'warnings'); return null; })
+            ]);
 
-                // Format attendance data
-                const fa = attendance.map(att => {
-                    const student = students.find(s => s.id === att.studentId);
-                    const subject = subjects.find(s => s.id === att.subjectId);
-                    return {
-                        ...att,
-                        studentName: student ? `${student.firstName} ${student.lastName}` : 'N/A',
-                        subjectName: subject?.name || 'N/A'
-                    };
-                });
-                if (isMounted) {
-                    setFormattedAttendance(fa);
-                }
-                
-                // Format warnings data
-                const fw = warnings.map(warn => {
-                    const student = students.find(s => s.id === warn.studentId);
-                    const subject = subjects.find(s => s.id === warn.subjectId);
-                    return {
-                        ...warn,
-                        studentName: student ? `${student.firstName} ${student.lastName}` : 'N/A',
-                        subjectName: subject?.name || 'N/A'
-                    };
-                });
-                if (isMounted) {
-                    setFormattedWarnings(fw);
-                }
+            if (!isMounted || !studentsSnapshot || !subjectsSnapshot || !attendanceSnapshot || !warningsSnapshot) {
+                if (isMounted) setIsLoading(false);
+                return;
+            }
 
-            } catch (error) {
-                console.error("Error fetching report data:", error);
-            } finally {
-                if (isMounted) {
-                    setIsLoading(false);
-                }
+            const students = studentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as (User & {id: string, name: string})[];
+            const subjects = subjectsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as (Subject & {id: string})[];
+            const attendance = attendanceSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as (Attendance & {id: string})[];
+            const warnings = warningsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as (Warning & {id: string})[];
+
+            // Format attendance data
+            const fa = attendance.map(att => {
+                const student = students.find(s => s.id === att.studentId);
+                const subject = subjects.find(s => s.id === att.subjectId);
+                return {
+                    ...att,
+                    studentName: student ? `${student.firstName} ${student.lastName}` : 'N/A',
+                    subjectName: subject?.name || 'N/A'
+                };
+            });
+            if (isMounted) {
+                setFormattedAttendance(fa);
+            }
+            
+            // Format warnings data
+            const fw = warnings.map(warn => {
+                const student = students.find(s => s.id === warn.studentId);
+                const subject = subjects.find(s => s.id === warn.subjectId);
+                return {
+                    ...warn,
+                    studentName: student ? `${student.firstName} ${student.lastName}` : 'N/A',
+                    subjectName: subject?.name || 'N/A'
+                };
+            });
+            if (isMounted) {
+                setFormattedWarnings(fw);
+            }
+
+            if (isMounted) {
+                setIsLoading(false);
             }
         };
 
