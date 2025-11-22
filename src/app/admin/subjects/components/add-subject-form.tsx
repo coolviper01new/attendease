@@ -88,7 +88,6 @@ const ScheduleArray = ({ control, name, label, description }: { control: any, na
 
     const handleCopySchedule = (targetDay: string) => {
       const allFormSchedules = control.getValues(name) as { day: string; startTime: string; endTime: string; room: string}[];
-      const targetFieldIndex = allFormSchedules.findIndex(f => f.day === targetDay);
       const targetDayOrder = daysOfWeek.indexOf(targetDay);
       
       let sourceSchedule = null;
@@ -104,16 +103,19 @@ const ScheduleArray = ({ control, name, label, description }: { control: any, na
       }
 
       if (sourceSchedule) {
-          update(targetFieldIndex, {
-              ...allFormSchedules[targetFieldIndex],
-              startTime: sourceSchedule.startTime,
-              endTime: sourceSchedule.endTime,
-              room: sourceSchedule.room,
-          });
-          toast({
-              title: 'Schedule Copied',
-              description: `Schedule from ${sourceSchedule.day} has been copied to ${targetDay}.`,
-          });
+          const targetFieldIndex = allFormSchedules.findIndex(f => f.day === targetDay);
+          if (targetFieldIndex !== -1) {
+            update(targetFieldIndex, {
+                ...allFormSchedules[targetFieldIndex],
+                startTime: sourceSchedule.startTime,
+                endTime: sourceSchedule.endTime,
+                room: sourceSchedule.room,
+            });
+            toast({
+                title: 'Schedule Copied',
+                description: `Schedule from ${sourceSchedule.day} has been copied to ${targetDay}.`,
+            });
+          }
       } else {
           toast({
               variant: 'destructive',
