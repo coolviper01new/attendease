@@ -4,7 +4,7 @@
 import { ColumnDef } from "@tanstack/react-table";
 import type { Subject, AttendanceSession as TAttendanceSession, Registration } from "@/lib/types";
 import { Button } from "@/components/ui/button";
-import { ArrowUpDown, MoreHorizontal, QrCode, PlayCircle, Clock, Trash2, ExternalLink } from "lucide-react";
+import { ArrowUpDown, MoreHorizontal, QrCode, PlayCircle, Clock, Trash2, Camera } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -46,13 +46,15 @@ import { groupBy } from "lodash";
 import { useToast } from "@/hooks/use-toast";
 import { errorEmitter } from "@/firebase/error-emitter";
 import { FirestorePermissionError } from "@/firebase/errors";
+import { AttendanceScannerDialog } from "./attendance-scanner-dialog";
+
 
 const SessionToggle = ({ subjectId, onRefresh }: { subjectId: string, onRefresh: () => void }) => {
   const firestore = useFirestore();
   const sessionsQuery = useMemoFirebase(() => 
     query(collection(firestore, 'subjects', subjectId, 'attendanceSessions'), where('isActive', '==', true))
   , [firestore, subjectId]);
-  const { data: sessions, isLoading } = useCollection<TAttendanceSession>(sessionsQuery);
+  const { data: sessions, isLoading, forceRefresh } = useCollection<TAttendanceSession>(sessionsQuery);
 
   const activeSession = sessions?.[0];
 
@@ -66,10 +68,12 @@ const SessionToggle = ({ subjectId, onRefresh }: { subjectId: string, onRefresh:
         isActive: true,
         qrCodeSecret: newSessionSecret
       });
+      forceRefresh();
       onRefresh();
     } else if (!checked && activeSession) {
       const sessionRef = doc(firestore, 'subjects', subjectId, 'attendanceSessions', activeSession.id);
       await updateDoc(sessionRef, { isActive: false, endTime: serverTimestamp() });
+      forceRefresh();
       onRefresh();
     }
   };
@@ -265,38 +269,45 @@ type GetColumnsProps = {
 
 const ActionsCell = ({ row, onEdit, onRefresh }: { row: any, onEdit: (subject: Subject) => void, onRefresh: () => void }) => {
     const subject = row.original as Subject;
+    const [isScannerOpen, setIsScannerOpen] = useState(false);
     
     if (row.getIsGrouped()) {
         return null; 
     }
 
     return (
-      <div className="text-right">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="h-8 w-8 p-0">
-              <span className="sr-only">Open menu</span>
-              <MoreHorizontal className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuLabel>{subject.name} ({subject.block})</DropdownMenuLabel>
-            <DropdownMenuGroup>
-                <DropdownMenuItem onClick={() => onEdit(subject)}>Edit Details</DropdownMenuItem>
-                <StartEnrollmentAction subject={subject} onStarted={onRefresh} />
-                <EnrollmentQrCodeDialog subject={subject} />
-            </DropdownMenuGroup>
-            <DropdownMenuSeparator />
-             <DropdownMenuItem asChild>
-              <Link href={`/attendance/${subject.id}`} className="flex items-center gap-2">
-                <ExternalLink className="h-4 w-4" />
+      <>
+        <AttendanceScannerDialog 
+          subject={subject}
+          open={isScannerOpen}
+          onOpenChange={setIsScannerOpen}
+          onRefresh={onRefresh}
+        />
+        <div className="text-right">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="h-8 w-8 p-0">
+                <span className="sr-only">Open menu</span>
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel>{subject.name} ({subject.block})</DropdownMenuLabel>
+              <DropdownMenuGroup>
+                  <DropdownMenuItem onClick={() => onEdit(subject)}>Edit Details</DropdownMenuItem>
+                  <StartEnrollmentAction subject={subject} onStarted={onRefresh} />
+                  <EnrollmentQrCodeDialog subject={subject} />
+              </DropdownMenuGroup>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => setIsScannerOpen(true)}>
+                <Camera className="mr-2 h-4 w-4" />
                 Open Attendance Scanner
-              </Link>
-            </DropdownMenuItem>
-             <DeleteSubjectAction subject={subject} onDeleted={onRefresh} />
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
+              </DropdownMenuItem>
+              <DeleteSubjectAction subject={subject} onDeleted={onRefresh} />
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </>
     );
 };
 
