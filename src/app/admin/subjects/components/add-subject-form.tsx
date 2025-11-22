@@ -91,6 +91,7 @@ const ScheduleArray = ({ control, name, label, description, isLab = false }: { c
         const currentDayOrder = daysOfWeek.indexOf(currentDay);
         
         let sourceIndex = -1;
+        // Find the index of the previously checked day
         for (let i = currentDayOrder - 1; i >= 0; i--) {
             const prevDay = daysOfWeek[i];
             const foundIndex = fields.findIndex(field => (field as any).day === prevDay);
@@ -109,16 +110,18 @@ const ScheduleArray = ({ control, name, label, description, isLab = false }: { c
           return;
         }
       
+        // Get the values from the source day
         const sourceSchedule = control.getValues(`${name}.${sourceIndex}`);
         if (!sourceSchedule) return;
       
         const { startTime, endTime, room } = sourceSchedule;
       
-        update(targetIndex, { ...fields[targetIndex], startTime, endTime, room });
+        // Update the target day with the source values
+        update(targetIndex, { ...(fields[targetIndex] as any), startTime, endTime, room });
 
         toast({
           title: 'Schedule Copied',
-          description: `Schedule from ${sourceSchedule.day} has been copied to ${currentDay}.`,
+          description: `Schedule from ${daysOfWeek[sourceIndex]} has been copied to ${currentDay}.`,
         });
     };
 
@@ -251,7 +254,7 @@ export function AddSubjectForm({ onSuccess, subject }: AddSubjectFormProps) {
         yearLevel: subject.yearLevel,
         credits: subject.credits || 3,
         hasLab: subject.hasLab || false,
-        lectureSchedules: subject.lectureSchedules,
+        lectureSchedules: subject.lectureSchedules || [],
         labSchedules: subject.labSchedules || [],
         block: subject.block,
         enrollmentStatus: subject.enrollmentStatus || 'closed',
@@ -475,3 +478,5 @@ export function AddSubjectForm({ onSuccess, subject }: AddSubjectFormProps) {
     </Form>
   );
 }
+
+    
