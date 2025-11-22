@@ -98,53 +98,47 @@ export function AttendanceScannerDialog({
   const { data: activeSessions, forceRefresh: refreshSessions } =
     useCollection<AttendanceSession>(activeSessionQuery);
   const activeSession = activeSessions?.[0];
+  
+  const todayDateString = new Date().toISOString().split('T')[0];
+  
+  const todaysAttendanceQuery = useMemoFirebase(
+      () => 
+          open ? query(
+              collectionGroup(firestore, 'attendance'),
+              where('subjectId', '==', subject.id),
+              where('date', '==', todayDateString)
+          ) : null,
+      [firestore, subject.id, open, todayDateString]
+  );
+  const { data: todaysAttendance, isLoading: isAttendanceLoading } = useCollection<Attendance>(todaysAttendanceQuery);
 
-  // This effect runs when the dialog opens with an active session, to load already-present students.
+  // This effect runs when the dialog opens or attendance data changes, to load all students present today.
   useEffect(() => {
     const fetchInitialAttendees = async () => {
-      if (activeSession && open) {
-        const attendanceCollectionRef = collection(
-            firestore,
-            `subjects/${subject.id}/attendanceSessions/${activeSession.id}/attendance`
-          );
-        
-        try {
-            const attendanceSnapshot = await getDocs(attendanceCollectionRef);
-            const attendanceRecords = attendanceSnapshot.docs.map(d => d.data() as Attendance);
-            
-            if (attendanceRecords.length > 0) {
-              const studentIds = attendanceRecords.map(att => att.studentId);
-              if (studentIds.length === 0) {
-                  setPresentStudents([]);
-                  return;
-              }
-              const studentRefs = studentIds.map(id => doc(firestore, 'users', id));
-              // This part can be optimized if student data is denormalized on attendance record
-              const studentSnaps = await Promise.all(studentRefs.map(ref => getDoc(ref)));
+        if (todaysAttendance && open) {
+            const studentIds = todaysAttendance.map(att => att.studentId);
+            if (studentIds.length > 0) {
+              const uniqueStudentIds = [...new Set(studentIds)]; // Handle potential duplicates if any
+              const studentRefs = uniqueStudentIds.map(id => doc(firestore, 'users', id));
+              
+              // This can be slow with many students. Consider denormalizing student name onto attendance record.
+              const studentSnaps = await Promise.all(studentRefs.map(ref => getDoc(ref).catch(e => null))); // Non-blocking, catch errors
               const studentsData = studentSnaps
-                .filter(snap => snap.exists())
-                .map(snap => ({ id: snap.id, ...snap.data() } as Student & { id: string }));
+                .filter(snap => snap && snap.exists())
+                .map(snap => ({ id: snap!.id, ...snap!.data() } as Student & { id: string }));
               
               setPresentStudents(studentsData.sort((a, b) => a.firstName.localeCompare(b.firstName)));
             } else {
                 setPresentStudents([]);
             }
-        } catch (err) {
-            console.error("Error fetching initial attendees:", err);
-            const permissionError = new FirestorePermissionError({
-                path: attendanceCollectionRef.path,
-                operation: 'list',
-            });
-            errorEmitter.emit('permission-error', permissionError);
+        } else if (!open) {
+            // Clear list when dialog closes
+            setPresentStudents([]);
         }
-      } else if (!open) {
-        // Clear list when dialog closes
-        setPresentStudents([]);
-      }
     };
     
     fetchInitialAttendees();
-  }, [activeSession, open, firestore, subject.id]);
+  }, [todaysAttendance, open, firestore]);
 
 
   // --- Clock effect ---
@@ -178,7 +172,7 @@ export function AttendanceScannerDialog({
         )
     });
 
-    setPresentStudents([]); // Clear the list when session stops
+    // Don't clear students on session stop, they remain present for the day.
     toast({ title: 'Attendance Session Stopped' });
     if(intervalRef.current) clearInterval(intervalRef.current);
     setTimeRemaining(null);
@@ -329,7 +323,7 @@ export function AttendanceScannerDialog({
             const studentData = { id: studentDoc.id, ...studentDoc.data() } as Student & { id: string };
             const studentName = `${studentData.firstName} ${studentData.lastName}`;
             
-            setConfirmationMessage(`${studentName}'s attendance is recorded`);
+            setConfirmationMessage(`Attendance of ${studentName} is Recorded`);
             
             setPresentStudents(prev => [...prev, studentData].sort((a,b) => a.firstName.localeCompare(b.firstName)));
 
@@ -340,7 +334,7 @@ export function AttendanceScannerDialog({
               timestamp: serverTimestamp(),
               status: 'present',
               recordedBy: adminUser.uid,
-              date: new Date().toISOString().split('T')[0],
+              date: todayDateString,
             };
             setDoc(attendanceDocRef, attendanceData).catch(error => {
                 errorEmitter.emit(
@@ -390,7 +384,8 @@ export function AttendanceScannerDialog({
     firestore,
     subject.id,
     toast,
-    presentStudents
+    presentStudents,
+    todayDateString
   ]);
 
   useEffect(() => {
@@ -442,12 +437,10 @@ export function AttendanceScannerDialog({
   };
 
   const onDialogClose = (isOpen: boolean) => {
-    onOpenChange(isOpen); // First, notify the parent component about the change.
-    if (!isOpen) { // Then, if the dialog is closing, perform cleanup.
-        if (activeSession) {
-           handleStopSession();
-       }
+    if (!isOpen && activeSession) {
+      handleStopSession();
     }
+    onOpenChange(isOpen);
   }
 
   return (
@@ -594,4 +587,4 @@ export function AttendanceScannerDialog({
   );
 }
 
-  
+    
