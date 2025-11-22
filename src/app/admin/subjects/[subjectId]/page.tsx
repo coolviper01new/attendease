@@ -1,3 +1,4 @@
+
 'use client';
 import { notFound, useParams } from "next/navigation";
 import { PageHeader } from "@/components/page-header";
@@ -42,6 +43,7 @@ export default function SubjectAttendancePage() {
   const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
   const [scannedData, setScannedData] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const isMounted = useRef(true);
 
   // --- Data Fetching ---
   const subjectDocRef = useMemoFirebase(() => doc(firestore, 'subjects', subjectId), [firestore, subjectId]);
@@ -62,11 +64,12 @@ export default function SubjectAttendancePage() {
   const [presentStudents, setPresentStudents] = useState<(Student & {id: string})[]>([]);
 
   useEffect(() => {
+      isMounted.current = true;
       const fetchStudentDetails = async () => {
           if (attendanceRecords && attendanceRecords.length > 0) {
               const studentIds = attendanceRecords.map(att => att.studentId);
               if (studentIds.length === 0) {
-                setPresentStudents([]);
+                if (isMounted.current) setPresentStudents([]);
                 return;
               };
 
@@ -79,16 +82,22 @@ export default function SubjectAttendancePage() {
                   getDocs(query(collection(firestore, 'users'), where('__name__', 'in', chunk)))
               );
               const studentSnapshots = await Promise.all(studentPromises);
+              if (!isMounted.current) return;
+
               const studentsData = studentSnapshots.flatMap(snapshot => 
                   snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Student & {id: string}))
               );
               setPresentStudents(studentsData);
           } else {
-              setPresentStudents([]);
+              if (isMounted.current) setPresentStudents([]);
           }
       };
 
       fetchStudentDetails();
+
+      return () => {
+        isMounted.current = false;
+      }
   }, [attendanceRecords, firestore]);
   
 
@@ -97,18 +106,20 @@ export default function SubjectAttendancePage() {
     const getCameraPermission = async () => {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
-        if (videoRef.current) {
+        if (isMounted.current && videoRef.current) {
           videoRef.current.srcObject = stream;
+          setHasCameraPermission(true);
         }
-        setHasCameraPermission(true);
       } catch (error) {
         console.error('Error accessing camera:', error);
-        setHasCameraPermission(false);
-        toast({
-          variant: 'destructive',
-          title: 'Camera Access Denied',
-          description: 'Please enable camera permissions in your browser settings to use this feature.',
-        });
+        if (isMounted.current) {
+          setHasCameraPermission(false);
+          toast({
+            variant: 'destructive',
+            title: 'Camera Access Denied',
+            description: 'Please enable camera permissions in your browser settings to use this feature.',
+          });
+        }
       }
     };
     getCameraPermission();
@@ -120,7 +131,7 @@ export default function SubjectAttendancePage() {
     const qrScanner = new QrScanner(
       videoRef.current,
       (result) => {
-        if (result.data && result.data !== scannedData) {
+        if (isMounted.current && result.data && result.data !== scannedData) {
           setScannedData(result.data);
         }
       },
@@ -151,8 +162,10 @@ export default function SubjectAttendancePage() {
         // Prevent re-scanning the same student in the same session
         if (attendanceRecords?.some(att => att.studentId === qrData.studentId)) {
           toast({ variant: 'destructive', title: 'Already Marked', description: 'This student has already been marked present for this session.' });
-          setScannedData(null);
-          setIsProcessing(false);
+          if(isMounted.current) {
+            setScannedData(null);
+            setIsProcessing(false);
+          }
           return;
         }
 
@@ -169,6 +182,7 @@ export default function SubjectAttendancePage() {
         };
 
         const result = await validateAttendance(validationInput);
+        if (!isMounted.current) return;
 
         if (result.isValid) {
           // Record attendance in Firestore
@@ -196,8 +210,10 @@ export default function SubjectAttendancePage() {
       } finally {
         // Reset after a delay to prevent immediate re-scans of the same code
         setTimeout(() => {
-          setScannedData(null);
-          setIsProcessing(false);
+          if(isMounted.current) {
+            setScannedData(null);
+            setIsProcessing(false);
+          }
         }, 2000);
       }
     };
@@ -237,9 +253,10 @@ export default function SubjectAttendancePage() {
 
   if (isLoading) {
     return (
-        <div className="container p-6">
+        <div className="p-6">
             <Skeleton className="h-10 w-1/2 mb-2" />
             <Skeleton className="h-4 w-1/3 mb-6" />
+            <Skeleton className="relative h-[calc(100vh-12rem)] w-full rounded-lg" />
         </div>
     )
   }
@@ -336,3 +353,5 @@ export default function SubjectAttendancePage() {
     </>
   );
 }
+
+    
