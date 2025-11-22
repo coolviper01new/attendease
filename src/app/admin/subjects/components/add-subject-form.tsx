@@ -76,8 +76,7 @@ interface AddSubjectFormProps {
 
 const ScheduleArray = ({ control, setValue, getValues, name, label, description }: { control: any, setValue: UseFormSetValue<SubjectFormValues>, getValues: UseFormGetValues<SubjectFormValues>, name: "lectureSchedules" | "labSchedules", label: string, description: string }) => {
     const { fields, append, remove, update } = useFieldArray({ control, name });
-    const [alert, setAlert] = useState<{variant: 'default' | 'destructive', title: string, description: string} | null>(null);
-
+    
     const handleDayCheckedChange = (checked: boolean, day: string) => {
         const fieldIndex = fields.findIndex(field => (field as any).day === day);
         if (checked && fieldIndex === -1) {
@@ -115,32 +114,14 @@ const ScheduleArray = ({ control, setValue, getValues, name, label, description 
                 endTime: sourceSchedule.endTime,
                 room: sourceSchedule.room,
             });
-            setAlert({
-                variant: 'default',
-                title: 'Schedule Copied',
-                description: `Schedule from ${sourceSchedule.day} has been copied to ${targetDay}.`,
-            });
           }
-      } else {
-          setAlert({
-              variant: 'destructive',
-              title: 'Cannot Copy',
-              description: 'There is no previous day with a complete schedule to copy from.',
-          });
       }
-      setTimeout(() => setAlert(null), 3000);
     };
 
     return (
         <div className="space-y-4 rounded-md border p-4">
           <FormLabel>{label}</FormLabel>
           <FormDescription className="!mt-0 mb-2">{description}</FormDescription>
-           {alert && (
-            <Alert variant={alert.variant} className="mb-4">
-              <AlertTitle>{alert.title}</AlertTitle>
-              <AlertDescription>{alert.description}</AlertDescription>
-            </Alert>
-          )}
           <div className="space-y-4">
             {daysOfWeek.map((day) => {
               const fieldIndex = fields.findIndex(f => (f as any).day === day);
