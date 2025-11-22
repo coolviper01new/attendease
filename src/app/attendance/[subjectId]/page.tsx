@@ -1,3 +1,4 @@
+
 import { getFirestore } from 'firebase-admin/firestore';
 import { adminApp } from '@/firebase/admin';
 import { notFound } from 'next/navigation';
