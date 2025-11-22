@@ -1,4 +1,4 @@
-import { getFirestore, doc, getDoc } from 'firebase-admin/firestore';
+import { getFirestore } from 'firebase-admin/firestore';
 import { adminApp } from '@/firebase/admin';
 import { notFound } from 'next/navigation';
 import type { Subject } from '@/lib/types';
@@ -9,10 +9,11 @@ async function getSubject(subjectId: string): Promise<Subject | null> {
   try {
     // IMPORTANT: Using adminApp() directly here for server-side data fetching
     const firestore = getFirestore(adminApp());
-    const subjectDocRef = doc(firestore, 'subjects', subjectId);
-    const subjectSnapshot = await getDoc(subjectDocRef);
+    // Correctly get the document reference using the Admin SDK syntax
+    const subjectDocRef = firestore.doc(`subjects/${subjectId}`);
+    const subjectSnapshot = await subjectDocRef.get();
 
-    if (!subjectSnapshot.exists()) {
+    if (!subjectSnapshot.exists) {
       return null;
     }
     // We manually add the id to the data object
