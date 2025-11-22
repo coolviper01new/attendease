@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { ColumnDef } from "@tanstack/react-table";
@@ -412,5 +411,3 @@ export const getColumns = ({ onEdit, onRefresh }: GetColumnsProps): ColumnDef<Su
     cell: (props) => <ActionsCell {...props} onEdit={onEdit} onRefresh={onRefresh} />,
   },
 ];
-
-    

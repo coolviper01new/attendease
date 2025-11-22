@@ -18,7 +18,8 @@ async function getSubject(subjectId: string): Promise<Subject | null> {
     const data = subjectSnapshot.data();
     if (!data) return null;
 
-    return { 
+    // We manually construct the object to ensure type safety and add the ID
+    return {
       id: subjectSnapshot.id,
       name: data.name,
       code: data.code,
@@ -34,6 +35,7 @@ async function getSubject(subjectId: string): Promise<Subject | null> {
     } as Subject;
   } catch (error) {
     console.error("Error fetching subject in server component:", error);
+    // In case of error, we treat it as if the subject was not found.
     return null;
   }
 }
@@ -46,5 +48,6 @@ export default async function SubjectAttendancePage({ params }: { params: { subj
     notFound();
   }
 
+  // The fetched subject data is passed as a prop to the Client Component
   return <AttendanceClient subject={subject} />;
 }
