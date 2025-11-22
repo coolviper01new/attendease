@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { PlusCircle } from "lucide-react";
 import { SubjectClient } from "./components/client";
 import { mockSubjects } from "@/lib/data";
+import { Card, CardContent } from "@/components/ui/card";
 
 export default function AdminSubjectsPage() {
   return (
@@ -16,7 +17,11 @@ export default function AdminSubjectsPage() {
         </Button>
       </PageHeader>
 
-      <SubjectClient data={mockSubjects} />
+      <Card>
+        <CardContent>
+          <SubjectClient data={mockSubjects} />
+        </CardContent>
+      </Card>
     </>
   );
 }

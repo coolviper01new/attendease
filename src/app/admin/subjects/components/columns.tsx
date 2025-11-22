@@ -67,7 +67,7 @@ export const columns: ColumnDef<Subject>[] = [
    {
     accessorKey: "blockId",
     header: "Block",
-     cell: ({ row }) => <Badge variant="secondary">{row.original.blockId.toLocaleUpperCase()}</Badge>,
+     cell: ({ row }) => <Badge variant="outline">{row.original.blockId.toLocaleUpperCase()}</Badge>,
   },
   {
     id: "sessionStatus",
@@ -93,7 +93,7 @@ export const columns: ColumnDef<Subject>[] = [
                 <Link href={`/admin/subjects/${subject.id}`}>Take Attendance</Link>
               </DropdownMenuItem>
               <DropdownMenuItem>Edit Subject</DropdownMenuItem>
-              <DropdownMenuItem className="text-destructive">Delete Subject</DropdownMenuItem>
+              <DropdownMenuItem className="text-destructive focus:text-destructive-foreground focus:bg-destructive">Delete Subject</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>

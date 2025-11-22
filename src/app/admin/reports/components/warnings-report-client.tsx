@@ -104,7 +104,7 @@ export function WarningsReportClient({ data }: WarningsReportClientProps) {
   });
 
   return (
-    <div>
+    <div className="mt-4">
       <div className="flex items-center py-4">
         <Input
           placeholder="Filter by student name..."

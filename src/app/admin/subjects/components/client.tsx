@@ -53,7 +53,7 @@ export function SubjectClient({ data }: SubjectClientProps) {
   });
 
   return (
-    <div>
+    <div className="mt-4">
       <div className="flex items-center py-4">
         <Input
           placeholder="Filter by subject name..."

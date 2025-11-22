@@ -5,6 +5,7 @@ import { Download } from "lucide-react";
 import { mockAttendance, mockStudents, mockSubjects, mockWarnings } from "@/lib/data";
 import { AttendanceReportClient } from "./components/attendance-report-client";
 import { WarningsReportClient } from "./components/warnings-report-client";
+import { Card, CardContent } from "@/components/ui/card";
 
 export default function AdminReportsPage() {
 
@@ -45,10 +46,18 @@ export default function AdminReportsPage() {
           <TabsTrigger value="warnings">Absence Warnings</TabsTrigger>
         </TabsList>
         <TabsContent value="attendance">
-            <AttendanceReportClient data={formattedAttendance} />
+            <Card>
+                <CardContent>
+                    <AttendanceReportClient data={formattedAttendance} />
+                </CardContent>
+            </Card>
         </TabsContent>
         <TabsContent value="warnings">
-            <WarningsReportClient data={formattedWarnings} />
+            <Card>
+                <CardContent>
+                    <WarningsReportClient data={formattedWarnings} />
+                </CardContent>
+            </Card>
         </TabsContent>
       </Tabs>
 

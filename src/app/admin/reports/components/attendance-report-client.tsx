@@ -62,7 +62,19 @@ const columns: ColumnDef<FormattedAttendance>[] = [
         header: "Status",
         cell: ({row}) => {
             const status = row.original.status;
-            return <Badge variant={status === 'present' ? 'default' : status === 'absent' ? 'destructive' : 'secondary'} className={cn(status === 'present' && 'bg-green-600')}>{status}</Badge>
+            return (
+              <Badge 
+                variant={status === 'present' ? 'default' : status === 'absent' ? 'destructive' : 'secondary'} 
+                className={cn(
+                  'capitalize',
+                  status === 'present' && 'bg-green-600/10 text-green-700 border-green-600/20 hover:bg-green-600/20',
+                  status === 'absent' && 'bg-destructive/10 text-destructive border-destructive/20 hover:bg-destructive/20',
+                  status === 'late' && 'bg-yellow-500/10 text-yellow-600 border-yellow-500/20 hover:bg-yellow-500/20'
+                )}
+              >
+                {status}
+              </Badge>
+            )
         }
     }
 ]
@@ -91,7 +103,7 @@ export function AttendanceReportClient({ data }: AttendanceReportClientProps) {
   });
 
   return (
-    <div>
+    <div className="mt-4">
       <div className="flex items-center py-4">
         <Input
           placeholder="Filter by student name..."

@@ -59,9 +59,9 @@ export default function StudentAttendancePage() {
                                                         variant={record.status === 'present' ? 'default' : record.status === 'absent' ? 'destructive' : 'secondary'} 
                                                         className={cn(
                                                             'capitalize',
-                                                            record.status === 'present' && 'bg-green-100 text-green-800 border-green-200',
-                                                            record.status === 'absent' && 'bg-red-100 text-red-800 border-red-200',
-                                                            record.status === 'late' && 'bg-yellow-100 text-yellow-800 border-yellow-200'
+                                                            record.status === 'present' && 'bg-green-600/10 text-green-700 border-green-600/20 hover:bg-green-600/20',
+                                                            record.status === 'absent' && 'bg-destructive/10 text-destructive border-destructive/20 hover:bg-destructive/20',
+                                                            record.status === 'late' && 'bg-yellow-500/10 text-yellow-600 border-yellow-500/20 hover:bg-yellow-500/20'
                                                             )}
                                                      >
                                                         {record.status}
