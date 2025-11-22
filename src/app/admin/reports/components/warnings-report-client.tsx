@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -71,7 +72,7 @@ const columns: ColumnDef<FormattedWarning>[] = [
                         </div>
                          <div className="space-y-2">
                             <h4 className="font-medium leading-none">Consecutive Absences</h4>
-                            <p className="text-sm text-muted-foreground">{row.original.absenceDates.join(', ')}</p>
+                            <p className="text-sm text-muted-foreground">{row.original.absenceDates?.join(', ')}</p>
                         </div>
                     </div>
                 </PopoverContent>
@@ -82,9 +83,10 @@ const columns: ColumnDef<FormattedWarning>[] = [
 
 interface WarningsReportClientProps {
   data: FormattedWarning[];
+  isLoading: boolean;
 }
 
-export function WarningsReportClient({ data }: WarningsReportClientProps) {
+export function WarningsReportClient({ data, isLoading }: WarningsReportClientProps) {
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
 
@@ -129,7 +131,13 @@ export function WarningsReportClient({ data }: WarningsReportClientProps) {
             ))}
           </TableHeader>
           <TableBody>
-            {table.getRowModel().rows?.length ? (
+            {isLoading ? (
+                <TableRow>
+                    <TableCell colSpan={columns.length} className="h-24 text-center">
+                        <p>Loading warnings...</p>
+                    </TableCell>
+                </TableRow>
+            ) : table.getRowModel().rows?.length ? (
               table.getRowModel().rows.map((row) => (
                 <TableRow key={row.id}>
                   {row.getVisibleCells().map((cell) => (
@@ -152,3 +160,5 @@ export function WarningsReportClient({ data }: WarningsReportClientProps) {
     </div>
   );
 }
+
+    

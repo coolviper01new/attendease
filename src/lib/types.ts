@@ -1,3 +1,4 @@
+
 export type SchoolYear = {
   id: string;
   name: string;
@@ -70,19 +71,28 @@ export type Warning = {
   absenceDates: string[];
 };
 
-export type Student = {
-  id: string;
-  name: string;
-  email: string;
+export type User = {
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    role: 'student' | 'admin';
+    avatarUrl?: string;
+}
+
+export type Student = User & {
+  role: 'student';
   studentNumber: string;
+  course: string;
   blockId: string;
-  avatarUrl: string;
   deviceId?: string;
+  name: string;
 };
 
-export type Admin = {
-  id: string;
+export type Admin = User & {
+  role: 'admin';
+  facultyId: string;
   name: string;
-  email: string;
-  avatarUrl: string;
 };
+
+    

@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -25,7 +26,8 @@ import { Input } from "@/components/ui/input";
 import { ArrowUpDown } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import type { AttendanceStatus } from "@/lib/types";
+import type { AttendanceStatus, User } from "@/lib/types";
+import { Skeleton } from "@/components/ui/skeleton";
 
 type FormattedAttendance = {
     id: string;
@@ -81,9 +83,10 @@ const columns: ColumnDef<FormattedAttendance>[] = [
 
 interface AttendanceReportClientProps {
   data: FormattedAttendance[];
+  isLoading: boolean;
 }
 
-export function AttendanceReportClient({ data }: AttendanceReportClientProps) {
+export function AttendanceReportClient({ data, isLoading }: AttendanceReportClientProps) {
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
 
@@ -128,7 +131,15 @@ export function AttendanceReportClient({ data }: AttendanceReportClientProps) {
             ))}
           </TableHeader>
           <TableBody>
-            {table.getRowModel().rows?.length ? (
+            {isLoading ? (
+                <TableRow>
+                    <TableCell colSpan={columns.length} className="h-24 text-center">
+                        <div className="flex justify-center items-center">
+                            <p>Loading attendance records...</p>
+                        </div>
+                    </TableCell>
+                </TableRow>
+            ) : table.getRowModel().rows?.length ? (
               table.getRowModel().rows.map((row) => (
                 <TableRow key={row.id}>
                   {row.getVisibleCells().map((cell) => (
@@ -151,3 +162,5 @@ export function AttendanceReportClient({ data }: AttendanceReportClientProps) {
     </div>
   );
 }
+
+    

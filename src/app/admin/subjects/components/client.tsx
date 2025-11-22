@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -29,9 +30,10 @@ import type { Subject } from "@/lib/types";
 
 interface SubjectClientProps {
   data: Subject[];
+  isLoading: boolean;
 }
 
-export function SubjectClient({ data }: SubjectClientProps) {
+export function SubjectClient({ data, isLoading }: SubjectClientProps) {
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
     []
@@ -85,7 +87,13 @@ export function SubjectClient({ data }: SubjectClientProps) {
             ))}
           </TableHeader>
           <TableBody>
-            {table.getRowModel().rows?.length ? (
+            {isLoading ? (
+              <TableRow>
+                <TableCell colSpan={columns.length} className="h-24 text-center">
+                  Loading subjects...
+                </TableCell>
+              </TableRow>
+            ) : table.getRowModel().rows?.length ? (
               table.getRowModel().rows.map((row) => (
                 <TableRow
                   key={row.id}
@@ -135,3 +143,5 @@ export function SubjectClient({ data }: SubjectClientProps) {
     </div>
   );
 }
+
+    

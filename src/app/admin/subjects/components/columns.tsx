@@ -1,7 +1,8 @@
+
 "use client";
 
 import { ColumnDef } from "@tanstack/react-table";
-import type { Subject } from "@/lib/types";
+import type { Subject, AttendanceSession as TAttendanceSession } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { ArrowUpDown, MoreHorizontal, QrCode } from "lucide-react";
 import {
@@ -13,18 +14,49 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { mockAttendanceSessions } from "@/lib/data";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
+import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
+import { collection, query, where } from "firebase/firestore";
+import { doc } from "firebase/firestore";
+import { updateDoc } from "firebase/firestore";
 
 const SessionToggle = ({ subjectId }: { subjectId: string }) => {
-  const session = mockAttendanceSessions.find(s => s.subjectId === subjectId);
-  // In a real app, you'd use a server action to update the state.
+  const firestore = useFirestore();
+  const sessionsQuery = useMemoFirebase(() => 
+    query(collection(firestore, 'subjects', subjectId, 'attendanceSessions'), where('isActive', '==', true))
+  , [firestore, subjectId]);
+  const { data: sessions, isLoading } = useCollection<TAttendanceSession>(sessionsQuery);
+
+  const activeSession = sessions?.[0];
+
+  const handleToggle = async (checked: boolean) => {
+    // This is a simplified logic. A real app would need a more robust way
+    // to handle session creation and deactivation.
+    if (checked && !activeSession) {
+      // Create a new session (logic to be implemented, maybe in a server action)
+      console.log(`Starting session for ${subjectId}`);
+    } else if (!checked && activeSession) {
+      // Deactivate the current session
+      const sessionRef = doc(firestore, 'subjects', subjectId, 'attendanceSessions', activeSession.id);
+      await updateDoc(sessionRef, { isActive: false });
+    }
+  };
+
+  if (isLoading) {
+    return <div className="flex items-center space-x-2">
+      <Switch id={`session-${subjectId}`} disabled />
+      <Label htmlFor={`session-${subjectId}`} className="text-xs text-muted-foreground">
+        Loading...
+      </Label>
+    </div>
+  }
+  
   return (
     <div className="flex items-center space-x-2">
-      <Switch id={`session-${subjectId}`} defaultChecked={session?.isActive} />
+      <Switch id={`session-${subjectId}`} checked={!!activeSession} onCheckedChange={handleToggle} />
       <Label htmlFor={`session-${subjectId}`} className="text-xs text-muted-foreground">
-        {session?.isActive ? "Active" : "Inactive"}
+        {activeSession ? "Active" : "Inactive"}
       </Label>
     </div>
   );
@@ -67,7 +99,7 @@ export const columns: ColumnDef<Subject>[] = [
    {
     accessorKey: "blockId",
     header: "Block",
-     cell: ({ row }) => <Badge variant="outline">{row.original.blockId.toLocaleUpperCase()}</Badge>,
+     cell: ({ row }) => <Badge variant="outline">{row.original.blockId?.toLocaleUpperCase() ?? 'N/A'}</Badge>,
   },
   {
     id: "sessionStatus",
@@ -101,3 +133,5 @@ export const columns: ColumnDef<Subject>[] = [
     },
   },
 ];
+
+    

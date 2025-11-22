@@ -1,33 +1,71 @@
+
+'use client';
 import { PageHeader } from "@/components/page-header";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Download } from "lucide-react";
-import { mockAttendance, mockStudents, mockSubjects, mockWarnings } from "@/lib/data";
 import { AttendanceReportClient } from "./components/attendance-report-client";
 import { WarningsReportClient } from "./components/warnings-report-client";
 import { Card, CardContent } from "@/components/ui/card";
+import { useCollection, useFirestore } from "@/firebase";
+import { collection, collectionGroup, getDocs, query } from "firebase/firestore";
+import { useMemo, useEffect, useState } from "react";
+import type { Attendance, Subject, User, Warning } from "@/lib/types";
 
 export default function AdminReportsPage() {
+    const firestore = useFirestore();
+    const [formattedAttendance, setFormattedAttendance] = useState<any[]>([]);
+    const [formattedWarnings, setFormattedWarnings] = useState<any[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
 
-    const formattedAttendance = mockAttendance.map(att => {
-        const student = mockStudents.find(s => s.id === att.studentId);
-        const subject = mockSubjects.find(s => s.id === att.subjectId);
-        return {
-            ...att,
-            studentName: student?.name || 'N/A',
-            subjectName: subject?.name || 'N/A'
-        }
-    });
+    useEffect(() => {
+        const fetchData = async () => {
+            setIsLoading(true);
+            try {
+                // Fetch all data
+                const studentsSnapshot = await getDocs(collection(firestore, 'users'));
+                const subjectsSnapshot = await getDocs(collection(firestore, 'subjects'));
+                const attendanceSnapshot = await getDocs(query(collectionGroup(firestore, 'attendance')));
+                const warningsSnapshot = await getDocs(query(collectionGroup(firestore, 'warnings')));
 
-    const formattedWarnings = mockWarnings.map(warn => {
-        const student = mockStudents.find(s => s.id === warn.studentId);
-        const subject = mockSubjects.find(s => s.id === warn.subjectId);
-        return {
-            ...warn,
-            studentName: student?.name || 'N/A',
-            subjectName: subject?.name || 'N/A'
-        }
-    });
+                const students = studentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as (User & {id: string, name: string})[];
+                const subjects = subjectsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as (Subject & {id: string})[];
+                const attendance = attendanceSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as (Attendance & {id: string})[];
+                const warnings = warningsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as (Warning & {id: string})[];
+
+                // Format attendance data
+                const fa = attendance.map(att => {
+                    const student = students.find(s => s.id === att.studentId);
+                    const subject = subjects.find(s => s.id === att.subjectId);
+                    return {
+                        ...att,
+                        studentName: student ? `${student.firstName} ${student.lastName}` : 'N/A',
+                        subjectName: subject?.name || 'N/A'
+                    };
+                });
+                setFormattedAttendance(fa);
+                
+                // Format warnings data
+                const fw = warnings.map(warn => {
+                    const student = students.find(s => s.id === warn.studentId);
+                    const subject = subjects.find(s => s.id === warn.subjectId);
+                    return {
+                        ...warn,
+                        studentName: student ? `${student.firstName} ${student.lastName}` : 'N/A',
+                        subjectName: subject?.name || 'N/A'
+                    };
+                });
+                setFormattedWarnings(fw);
+
+            } catch (error) {
+                console.error("Error fetching report data:", error);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        fetchData();
+    }, [firestore]);
 
   return (
     <>
@@ -35,7 +73,7 @@ export default function AdminReportsPage() {
         title="Reports"
         description="View and export attendance records and warnings."
       >
-        <Button>
+        <Button disabled>
           <Download className="mr-2 h-4 w-4" /> Download All
         </Button>
       </PageHeader>
@@ -48,14 +86,14 @@ export default function AdminReportsPage() {
         <TabsContent value="attendance">
             <Card>
                 <CardContent>
-                    <AttendanceReportClient data={formattedAttendance} />
+                    <AttendanceReportClient data={formattedAttendance} isLoading={isLoading} />
                 </CardContent>
             </Card>
         </TabsContent>
         <TabsContent value="warnings">
             <Card>
                 <CardContent>
-                    <WarningsReportClient data={formattedWarnings} />
+                    <WarningsReportClient data={formattedWarnings} isLoading={isLoading} />
                 </CardContent>
             </Card>
         </TabsContent>
@@ -64,3 +102,5 @@ export default function AdminReportsPage() {
     </>
   );
 }
+
+    

@@ -1,19 +1,38 @@
+
+'use client';
 import { PageHeader } from "@/components/page-header";
-import { getStudentAttendance, mockStudents, mockSubjects } from "@/lib/data";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { StatCard } from "@/components/stat-card";
 import { CheckCircle2, XCircle, Clock, BarChartHorizontal } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-const student = mockStudents[0];
-const attendanceRecords = getStudentAttendance(student.id);
+import { useUser, useFirestore, useCollection, useMemoFirebase } from "@/firebase";
+import { collection, query, where, collectionGroup } from "firebase/firestore";
+import type { Attendance, Subject } from "@/lib/types";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useMemo } from "react";
 
 export default function StudentAttendancePage() {
-    const presentCount = attendanceRecords.filter(r => r.status === 'present').length;
-    const absentCount = attendanceRecords.filter(r => r.status === 'absent').length;
-    const lateCount = attendanceRecords.filter(r => r.status === 'late').length;
+    const { user, isUserLoading } = useUser();
+    const firestore = useFirestore();
+
+    const attendanceQuery = useMemoFirebase(() => {
+        if (!user) return null;
+        // This query is expensive. It scans all attendance records.
+        // A better structure would be /users/{userId}/attendance
+        return query(collectionGroup(firestore, 'attendance'), where('studentId', '==', user.uid));
+    }, [user, firestore]);
+    const { data: attendanceRecords, isLoading: isAttendanceLoading } = useCollection<Attendance>(attendanceQuery);
+
+    const { data: subjects, isLoading: areSubjectsLoading } = useCollection<Subject>(useMemo(() => collection(firestore, 'subjects'), [firestore]));
+
+    const isLoading = isUserLoading || isAttendanceLoading || areSubjectsLoading;
+
+    const presentCount = attendanceRecords?.filter(r => r.status === 'present').length ?? 0;
+    const absentCount = attendanceRecords?.filter(r => r.status === 'absent').length ?? 0;
+    const lateCount = attendanceRecords?.filter(r => r.status === 'late').length ?? 0;
+    const totalRecords = attendanceRecords?.length ?? 0;
 
     return (
         <>
@@ -23,9 +42,9 @@ export default function StudentAttendancePage() {
             />
 
             <div className="grid gap-4 md:grid-cols-3 mb-6">
-                <StatCard title="Present" value={presentCount} icon={CheckCircle2} description={`${((presentCount / attendanceRecords.length) * 100).toFixed(0)}% attendance rate`} />
-                <StatCard title="Absent" value={absentCount} icon={XCircle} description={`${((absentCount / attendanceRecords.length) * 100).toFixed(0)}% absence rate`} />
-                <StatCard title="Late" value={lateCount} icon={Clock} description={`${((lateCount / attendanceRecords.length) * 100).toFixed(0)}% late rate`} />
+                <StatCard title="Present" value={isLoading ? '...' : presentCount} icon={CheckCircle2} description={totalRecords > 0 ? `${((presentCount / totalRecords) * 100).toFixed(0)}% attendance rate` : 'No records yet'} />
+                <StatCard title="Absent" value={isLoading ? '...' : absentCount} icon={XCircle} description={totalRecords > 0 ? `${((absentCount / totalRecords) * 100).toFixed(0)}% absence rate` : 'No records yet'} />
+                <StatCard title="Late" value={isLoading ? '...' : lateCount} icon={Clock} description={totalRecords > 0 ? `${((lateCount / totalRecords) * 100).toFixed(0)}% late rate` : 'No records yet'} />
             </div>
 
             <Card>
@@ -47,9 +66,15 @@ export default function StudentAttendancePage() {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {attendanceRecords.length > 0 ? (
+                                {isLoading ? (
+                                    <TableRow>
+                                        <TableCell colSpan={3} className="h-24 text-center">
+                                            Loading attendance history...
+                                        </TableCell>
+                                    </TableRow>
+                                ) : totalRecords > 0 ? (
                                     attendanceRecords.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map(record => {
-                                        const subject = mockSubjects.find(s => s.id === record.subjectId);
+                                        const subject = subjects?.find(s => s.id === record.subjectId);
                                         return (
                                             <TableRow key={record.id}>
                                                 <TableCell className="font-medium">{new Date(record.date).toLocaleDateString()}</TableCell>
@@ -85,3 +110,5 @@ export default function StudentAttendancePage() {
         </>
     )
 }
+
+    

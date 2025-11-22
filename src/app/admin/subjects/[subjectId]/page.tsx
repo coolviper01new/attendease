@@ -1,8 +1,9 @@
-import { mockSubjects, mockStudents } from "@/lib/data";
-import { notFound } from "next/navigation";
+
+'use client';
+import { notFound, useParams } from "next/navigation";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
-import { QrCode, PlayCircle, StopCircle } from "lucide-react";
+import { QrCode, StopCircle } from "lucide-react";
 import {
   Card,
   CardContent,
@@ -20,22 +21,46 @@ import {
 } from "@/components/ui/table";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { cn } from "@/lib/utils";
+import { useDoc, useCollection, useFirestore, useMemoFirebase } from "@/firebase";
+import { doc, collection, query, where } from "firebase/firestore";
+import type { Subject, User, Student } from "@/lib/types";
+import { Skeleton } from "@/components/ui/skeleton";
 
-export default function SubjectAttendancePage({
-  params,
-}: {
-  params: { subjectId: string };
-}) {
-  const subject = mockSubjects.find((s) => s.id === params.subjectId);
+export default function SubjectAttendancePage() {
+  const params = useParams();
+  const subjectId = params.subjectId as string;
+  const firestore = useFirestore();
+
+  const subjectDocRef = useMemoFirebase(() => doc(firestore, 'subjects', subjectId), [firestore, subjectId]);
+  const { data: subject, isLoading: isSubjectLoading } = useDoc<Subject>(subjectDocRef);
+
+  const studentsQuery = useMemoFirebase(() => {
+    if (!subject?.blockId) return null;
+    return query(collection(firestore, 'users'), where('blockId', '==', subject.blockId), where('role', '==', 'student'));
+  }, [firestore, subject?.blockId]);
+  const { data: registeredStudents, isLoading: areStudentsLoading } = useCollection<Student>(studentsQuery);
+
+  if (isSubjectLoading) {
+    return (
+        <div className="container p-6">
+            <Skeleton className="h-10 w-1/2 mb-2" />
+            <Skeleton className="h-4 w-1/3 mb-6" />
+            <Card>
+                <CardHeader>
+                    <Skeleton className="h-8 w-1/4" />
+                    <Skeleton className="h-4 w-1/2" />
+                </CardHeader>
+                <CardContent>
+                    <Skeleton className="h-48 w-full" />
+                </CardContent>
+            </Card>
+        </div>
+    )
+  }
 
   if (!subject) {
     notFound();
   }
-
-  const registeredStudents = mockStudents.filter(
-    (student) => student.blockId === subject.blockId
-  );
 
   return (
     <>
@@ -68,33 +93,47 @@ export default function SubjectAttendancePage({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {registeredStudents.map((student) => (
-                  <TableRow key={student.id}>
-                    <TableCell>
-                      <div className="flex items-center gap-3">
-                        <Avatar>
-                          <AvatarImage src={student.avatarUrl} alt={student.name} />
-                          <AvatarFallback>{student.name.charAt(0)}</AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <div className="font-medium">{student.name}</div>
-                          <div className="text-sm text-muted-foreground">
-                            {student.studentNumber}
+                {areStudentsLoading ? (
+                    <TableRow>
+                        <TableCell colSpan={3} className="h-24 text-center">
+                            Loading students...
+                        </TableCell>
+                    </TableRow>
+                ) : registeredStudents && registeredStudents.length > 0 ? (
+                  registeredStudents.map((student) => (
+                    <TableRow key={student.id}>
+                      <TableCell>
+                        <div className="flex items-center gap-3">
+                          <Avatar>
+                            <AvatarImage src={student.avatarUrl} alt={student.name} />
+                            <AvatarFallback>{student.name?.charAt(0)}</AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <div className="font-medium">{student.firstName} {student.lastName}</div>
+                            <div className="text-sm text-muted-foreground">
+                              {student.studentNumber}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline">Not Marked</Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex gap-2 justify-end">
-                        <Button size="sm" variant="outline">Absent</Button>
-                        <Button size="sm">Present</Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline">Not Marked</Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex gap-2 justify-end">
+                          <Button size="sm" variant="outline">Absent</Button>
+                          <Button size="sm">Present</Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                    <TableRow>
+                        <TableCell colSpan={3} className="h-24 text-center">
+                            No students enrolled in this block.
+                        </TableCell>
+                    </TableRow>
+                )}
               </TableBody>
             </Table>
           </div>
@@ -103,3 +142,5 @@ export default function SubjectAttendancePage({
     </>
   );
 }
+
+    
