@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -11,7 +12,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { QrCode, Clock, BookOpen, AlertTriangle } from 'lucide-react';
+import { QrCode, Clock, BookOpen, AlertTriangle, CalendarCheck, Info } from 'lucide-react';
 import Image from 'next/image';
 import {
   Dialog,
@@ -24,27 +25,28 @@ import {
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 import { useUser, useFirestore, useDoc, useCollection, useMemoFirebase } from '@/firebase';
-import { doc, collection, query, where, getDocs } from 'firebase/firestore';
-import type { Student, Subject, Registration } from '@/lib/types';
+import { doc, collection, query, where, getDocs, updateDoc } from 'firebase/firestore';
+import type { Student, Subject, Registration, Schedule } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
-import { updateDoc } from 'firebase/firestore';
+import { Separator } from '@/components/ui/separator';
+import { cn } from '@/lib/utils';
 
 const QrCodeDialog = ({
   studentId,
-  subjectId,
+  subject,
   isDeviceRegistered,
   isCurrentDevice,
   onRegister,
 }: {
   studentId: string;
-  subjectId: string;
+  subject: Subject;
   isDeviceRegistered: boolean;
   isCurrentDevice: boolean;
   onRegister: () => void;
 }) => {
   if (!isDeviceRegistered) {
     return (
-      <Button onClick={onRegister}>
+      <Button onClick={onRegister} className="w-full">
         Register This Device
       </Button>
     );
@@ -52,19 +54,18 @@ const QrCodeDialog = ({
 
   if (!isCurrentDevice) {
     return (
-      <Alert variant="destructive" className="mt-4">
+      <Alert variant="destructive" className="mt-4 text-center">
         <AlertTriangle className="h-4 w-4" />
-        <AlertTitle>Device Not Registered</AlertTitle>
+        <AlertTitle>Device Mismatch</AlertTitle>
         <AlertDescription>
-          You can only generate QR codes from your registered device. Please
-          contact an admin if you need to change it.
+          Please use your registered device to generate QR codes.
         </AlertDescription>
       </Alert>
     );
   }
 
   const qrCodeSecret = 'supersecretkey'; // This should be unique per session in a real app
-  const qrData = JSON.stringify({ studentId, subjectId, qrCodeSecret });
+  const qrData = JSON.stringify({ studentId, subjectId: subject.id, qrCodeSecret });
   const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(
     qrData
   )}`;
@@ -72,7 +73,7 @@ const QrCodeDialog = ({
   return (
     <Dialog>
       <DialogTrigger asChild>
-        <Button>
+        <Button className="w-full">
           <QrCode className="mr-2 h-4 w-4" /> View QR Code
         </Button>
       </DialogTrigger>
@@ -80,8 +81,7 @@ const QrCodeDialog = ({
         <DialogHeader>
           <DialogTitle>Your Attendance QR Code</DialogTitle>
           <DialogDescription>
-            Present this to the administrator for attendance marking. This code
-            is unique to you and this subject.
+            Present this code for {subject.name} ({subject.block}) for marking.
           </DialogDescription>
         </DialogHeader>
         <div className="flex items-center justify-center p-4 bg-white rounded-lg">
@@ -97,6 +97,76 @@ const QrCodeDialog = ({
   );
 };
 
+
+const SubjectCard = ({ subject, student, isClient, isDeviceRegistered, isCurrentDevice, onRegisterDevice, isToday }: {
+    subject: Subject;
+    student: Student | null;
+    isClient: boolean;
+    isDeviceRegistered: boolean;
+    isCurrentDevice: boolean;
+    onRegisterDevice: () => void;
+    isToday?: boolean;
+}) => {
+
+    const getTodaySchedules = (schedules: Schedule[] = [], day: string) => {
+        return schedules.filter(sc => sc.day === day);
+    }
+    
+    const today = new Date().toLocaleDateString('en-US', { weekday: 'long' });
+    const todayLecSchedules = getTodaySchedules(subject.lectureSchedules, today);
+    const todayLabSchedules = getTodaySchedules(subject.labSchedules, today);
+
+    const schedulesToShow = isToday ? [...todayLecSchedules, ...todayLabSchedules] : subject.lectureSchedules;
+    const labSchedulesToShow = isToday ? [] : subject.labSchedules;
+
+
+    return (
+        <Card key={subject.id} className="flex flex-col hover:border-primary/50 transition-colors">
+            <CardHeader>
+              <div className="flex items-start justify-between">
+                <div>
+                  <CardTitle className="font-headline text-xl mb-1">
+                    {subject.name}
+                  </CardTitle>
+                  <CardDescription>{subject.code} ({subject.block})</CardDescription>
+                </div>
+                <div className="bg-primary/10 text-primary p-2 rounded-lg">
+                  <BookOpen className="w-5 h-5" />
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="flex-grow space-y-3">
+              {schedulesToShow.map((schedule, index) => (
+                <div key={`lec-${index}`} className="flex items-center text-sm text-muted-foreground">
+                  <Clock className="mr-2 h-4 w-4 flex-shrink-0" />
+                  <span className="truncate font-medium text-foreground">
+                    {isToday ? '' : 'Lec: '}{schedule.day}, {schedule.startTime} - {schedule.endTime} @ {schedule.room}
+                  </span>
+                </div>
+              ))}
+              {labSchedulesToShow?.map((schedule, index) => (
+                <div key={`lab-${index}`} className="flex items-center text-sm text-muted-foreground">
+                  <Clock className="mr-2 h-4 w-4 flex-shrink-0" />
+                  <span className="truncate">
+                    Lab: {schedule.day}, {schedule.startTime} - {schedule.endTime} @ {schedule.room}
+                  </span>
+                </div>
+              ))}
+            </CardContent>
+            <CardFooter>
+              {isClient && student && (
+                <QrCodeDialog
+                  studentId={student.id}
+                  subject={subject}
+                  isDeviceRegistered={isDeviceRegistered}
+                  isCurrentDevice={isCurrentDevice}
+                  onRegister={onRegisterDevice}
+                />
+              )}
+            </CardFooter>
+          </Card>
+    )
+}
 
 export default function StudentDashboardPage() {
   const { user, isUserLoading } = useUser();
@@ -164,7 +234,6 @@ export default function StudentDashboardPage() {
     }
   }, [userRegistrations, areRegsLoading, firestore]);
 
-
   const handleRegisterDevice = async () => {
     if (!userDocRef || !currentDeviceId) return;
 
@@ -188,29 +257,38 @@ export default function StudentDashboardPage() {
   const isCurrentDevice = isDeviceRegistered && student?.deviceId === currentDeviceId;
   const isLoading = isUserLoading || isStudentLoading || areRegsLoading || areSubjectsLoading;
   
+  const todayWeekday = new Date().toLocaleDateString('en-US', { weekday: 'long' });
+  const todaysSubjects = useMemo(() => 
+    enrolledSubjects.filter(subject => 
+        subject.lectureSchedules.some(s => s.day === todayWeekday) || 
+        subject.labSchedules?.some(s => s.day === todayWeekday)
+    ), [enrolledSubjects, todayWeekday]);
+
+
   if (isLoading) {
     return (
         <>
             <PageHeader
-                title="My Subjects"
-                description="Here are the subjects you are enrolled in."
+                title="My Dashboard"
+                description="Loading your schedule and subjects..."
             />
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                {[...Array(3)].map((_, i) => (
-                    <Card key={i}>
-                        <CardHeader>
-                            <Skeleton className="h-6 w-3/4" />
-                            <Skeleton className="h-4 w-1/4" />
-                        </CardHeader>
-                        <CardContent>
-                             <Skeleton className="h-4 w-1/2" />
-                             <Skeleton className="h-4 w-1/3 mt-1" />
-                        </CardContent>
-                        <CardFooter>
-                             <Skeleton className="h-10 w-36" />
-                        </CardFooter>
-                    </Card>
-                ))}
+            <div className="space-y-6">
+                <div>
+                    <Skeleton className="h-8 w-48 mb-4" />
+                    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                        {[...Array(2)].map((_, i) => (
+                            <Card key={i}><CardHeader><Skeleton className="h-6 w-3/4" /></CardHeader><CardContent><Skeleton className="h-4 w-1/2" /></CardContent><CardFooter><Skeleton className="h-10 w-full" /></CardFooter></Card>
+                        ))}
+                    </div>
+                </div>
+                <div>
+                    <Skeleton className="h-8 w-48 mb-4" />
+                    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                        {[...Array(3)].map((_, i) => (
+                            <Card key={i}><CardHeader><Skeleton className="h-6 w-3/4" /></CardHeader><CardContent><Skeleton className="h-4 w-1/2" /></CardContent><CardFooter><Skeleton className="h-10 w-full" /></CardFooter></Card>
+                        ))}
+                    </div>
+                </div>
             </div>
         </>
     )
@@ -219,76 +297,80 @@ export default function StudentDashboardPage() {
   return (
     <>
       <PageHeader
-        title="My Subjects"
-        description="Here are the subjects you are enrolled in."
+        title="My Dashboard"
+        description={`Welcome back, ${student?.firstName || 'student'}! Here's what's happening.`}
       />
 
       {isClient && !isDeviceRegistered && (
-        <Alert className="mb-6 bg-blue-50 border-blue-200 text-blue-800">
-          <AlertTriangle className="h-4 w-4 !text-blue-800" />
+        <Alert className="mb-6 bg-blue-500/10 border-blue-500/20 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300 dark:border-blue-900">
+          <Info className="h-4 w-4" />
           <AlertTitle>Device Registration Required</AlertTitle>
           <AlertDescription>
             To generate QR codes for attendance, you must register your primary
-            device. This is a one-time action.
+            device. This is a one-time action and can be done from any subject card below.
           </AlertDescription>
         </Alert>
       )}
 
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {enrolledSubjects && enrolledSubjects.map((subject) => (
-          <Card key={subject.id} className="flex flex-col">
-            <CardHeader>
-              <div className="flex items-start justify-between">
-                <div>
-                  <CardTitle className="font-headline text-xl mb-1">
-                    {subject.name}
-                  </CardTitle>
-                  <CardDescription>{subject.code} ({subject.block})</CardDescription>
+    <div className="space-y-8">
+        <div>
+            <h2 className="text-2xl font-headline font-bold mb-4 flex items-center gap-2">
+                <CalendarCheck className="w-6 h-6 text-primary"/>
+                Today's Schedule
+            </h2>
+             {todaysSubjects.length > 0 ? (
+                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                    {todaysSubjects.map(subject => (
+                        <SubjectCard 
+                            key={subject.id}
+                            subject={subject}
+                            student={student}
+                            isClient={isClient}
+                            isDeviceRegistered={isDeviceRegistered}
+                            isCurrentDevice={isCurrentDevice}
+                            onRegisterDevice={handleRegisterDevice}
+                            isToday={true}
+                        />
+                    ))}
                 </div>
-                <div className="bg-primary/10 text-primary p-2 rounded-lg">
-                  <BookOpen className="w-5 h-5" />
+             ) : (
+                <Card className="mt-6 border-dashed">
+                    <CardContent className="pt-6">
+                        <p className="text-center text-muted-foreground">You have no classes scheduled for today. Enjoy your day off!</p>
+                    </CardContent>
+                </Card>
+             )}
+        </div>
+        
+        <Separator />
+
+        <div>
+             <h2 className="text-2xl font-headline font-bold mb-4">All My Subjects</h2>
+             {enrolledSubjects.length > 0 ? (
+                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                    {enrolledSubjects.map((subject) => (
+                        <SubjectCard 
+                            key={subject.id}
+                            subject={subject}
+                            student={student}
+                            isClient={isClient}
+                            isDeviceRegistered={isDeviceRegistered}
+                            isCurrentDevice={isCurrentDevice}
+                            onRegisterDevice={handleRegisterDevice}
+                        />
+                    ))}
                 </div>
-              </div>
-            </CardHeader>
-            <CardContent className="flex-grow space-y-2">
-               {subject.lectureSchedules.map((schedule, index) => (
-                <div key={`lec-${index}`} className="flex items-center text-sm text-muted-foreground">
-                  <Clock className="mr-2 h-4 w-4 flex-shrink-0" />
-                  <span className="truncate">
-                    Lec: {schedule.day}, {schedule.startTime} - {schedule.endTime} @ {schedule.room}
-                  </span>
-                </div>
-              ))}
-              {subject.hasLab && subject.labSchedules?.map((schedule, index) => (
-                <div key={`lab-${index}`} className="flex items-center text-sm text-muted-foreground">
-                  <Clock className="mr-2 h-4 w-4 flex-shrink-0" />
-                  <span className="truncate">
-                    Lab: {schedule.day}, {schedule.startTime} - {schedule.endTime} @ {schedule.room}
-                  </span>
-                </div>
-              ))}
-            </CardContent>
-            <CardFooter>
-              {isClient && student && (
-                <QrCodeDialog
-                  studentId={student.id}
-                  subjectId={subject.id}
-                  isDeviceRegistered={isDeviceRegistered}
-                  isCurrentDevice={isCurrentDevice}
-                  onRegister={handleRegisterDevice}
-                />
+              ) : (
+                 <Card className="mt-6 border-dashed">
+                    <CardContent className="pt-6">
+                        <p className="text-center text-muted-foreground">You are not enrolled in any subjects. Go to the Enrollment page to get started.</p>
+                    </CardContent>
+                </Card>
               )}
-            </CardFooter>
-          </Card>
-        ))}
-      </div>
-       {!isLoading && enrolledSubjects.length === 0 && (
-          <Card className="mt-6">
-              <CardContent className="pt-6">
-                  <p className="text-center text-muted-foreground">You are not enrolled in any subjects. Go to the Enrollment page to get started.</p>
-              </CardContent>
-          </Card>
-      )}
+        </div>
+    </div>
+      
     </>
   );
 }
+
