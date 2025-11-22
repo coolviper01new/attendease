@@ -25,19 +25,22 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { columns } from "./columns";
+import { getColumns } from "./columns";
 import type { Subject } from "@/lib/types";
 
 interface SubjectClientProps {
   data: Subject[];
   isLoading: boolean;
+  onEdit: (subject: Subject) => void;
 }
 
-export function SubjectClient({ data, isLoading }: SubjectClientProps) {
+export function SubjectClient({ data, isLoading, onEdit }: SubjectClientProps) {
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
     []
   );
+
+  const columns = React.useMemo(() => getColumns({ onEdit }), [onEdit]);
   
   const table = useReactTable({
     data,
@@ -143,5 +146,3 @@ export function SubjectClient({ data, isLoading }: SubjectClientProps) {
     </div>
   );
 }
-
-    

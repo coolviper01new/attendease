@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -24,10 +24,11 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { useFirestore } from '@/firebase';
-import { addDoc, collection } from 'firebase/firestore';
+import { addDoc, collection, doc, setDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Copy } from 'lucide-react';
+import type { Subject } from '@/lib/types';
 
 const schoolYearRegex = /^\d{4}-\d{4}$/;
 
@@ -54,33 +55,65 @@ const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 
 interface AddSubjectFormProps {
   onSuccess: () => void;
+  subject?: Subject | null;
 }
 
-export function AddSubjectForm({ onSuccess }: AddSubjectFormProps) {
+export function AddSubjectForm({ onSuccess, subject }: AddSubjectFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const firestore = useFirestore();
   const { toast } = useToast();
 
+  const isEditMode = !!subject;
+
   const form = useForm<SubjectFormValues>({
     resolver: zodResolver(subjectSchema),
-    defaultValues: {
+    defaultValues: isEditMode ? {
+        ...subject,
+        schoolYear: subject.schoolYear,
+        yearLevel: subject.yearLevel,
+    } : {
       schedules: [],
+      schoolYear: '',
+      yearLevel: '',
+      name: '',
+      code: '',
+      description: '',
+      block: '',
     },
   });
+  
+  useEffect(() => {
+    if (isEditMode) {
+      form.reset({
+        ...subject,
+        schoolYear: subject.schoolYear,
+        yearLevel: subject.yearLevel,
+      });
+    } else {
+        form.reset({
+            schedules: [],
+            schoolYear: '',
+            yearLevel: '',
+            name: '',
+            code: '',
+            description: '',
+            block: '',
+        })
+    }
+  }, [subject, form, isEditMode]);
 
-  const { fields, append, remove } = useFieldArray({
+
+  const { fields, append, remove, update } = useFieldArray({
     control: form.control,
     name: 'schedules',
   });
 
   const handleDayCheckedChange = (checked: boolean, day: string) => {
-    if (checked) {
+    const fieldIndex = fields.findIndex(field => field.day === day);
+    if (checked && fieldIndex === -1) {
       append({ day, startTime: '', endTime: '', room: '' });
-    } else {
-      const indexToRemove = fields.findIndex(field => field.day === day);
-      if (indexToRemove > -1) {
-        remove(indexToRemove);
-      }
+    } else if (!checked && fieldIndex > -1) {
+      remove(fieldIndex);
     }
   };
 
@@ -113,9 +146,9 @@ export function AddSubjectForm({ onSuccess }: AddSubjectFormProps) {
   
     const { startTime, endTime, room } = sourceSchedule;
   
-    form.setValue(`schedules.${targetIndex}.startTime`, startTime);
-    form.setValue(`schedules.${targetIndex}.endTime`, endTime);
-    form.setValue(`schedules.${targetIndex}.room`, room);
+    // Use `update` from useFieldArray to set values for a specific index
+    update(targetIndex, { ...fields[targetIndex], startTime, endTime, room });
+
 
     toast({
       title: 'Schedule Copied',
@@ -126,25 +159,27 @@ export function AddSubjectForm({ onSuccess }: AddSubjectFormProps) {
   const onSubmit = async (values: SubjectFormValues) => {
     setIsSubmitting(true);
     try {
-      const subjectData = {
-        ...values,
-        // Ensure we are only storing the data defined in the schema
-        // This is a simplified example; a real app might need more complex data transformation.
-      };
-      await addDoc(collection(firestore, 'subjects'), subjectData);
-      
-      toast({
-        title: 'Subject Created',
-        description: `${values.name} has been added successfully.`,
-      });
-      form.reset({schedules: []});
+      if (isEditMode && subject?.id) {
+        const subjectRef = doc(firestore, 'subjects', subject.id);
+        await setDoc(subjectRef, values, { merge: true });
+        toast({
+          title: 'Subject Updated',
+          description: `${values.name} has been updated successfully.`,
+        });
+      } else {
+        await addDoc(collection(firestore, 'subjects'), values);
+        toast({
+          title: 'Subject Created',
+          description: `${values.name} has been added successfully.`,
+        });
+      }
       onSuccess();
     } catch (error) {
-      console.error('Error adding subject:', error);
+      console.error('Error saving subject:', error);
       toast({
         variant: 'destructive',
         title: 'Error',
-        description: 'Failed to create subject. Please try again.',
+        description: `Failed to ${isEditMode ? 'update' : 'create'} subject. Please try again.`,
       });
     } finally {
       setIsSubmitting(false);
@@ -213,7 +248,7 @@ export function AddSubjectForm({ onSuccess }: AddSubjectFormProps) {
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Year Level</FormLabel>
-                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                <Select onValueChange={field.onChange} value={field.value}>
                   <FormControl>
                     <SelectTrigger>
                       <SelectValue placeholder="Select a year level" />
@@ -332,7 +367,7 @@ export function AddSubjectForm({ onSuccess }: AddSubjectFormProps) {
         </div>
 
         <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? 'Creating...' : 'Create Subject'}
+          {isSubmitting ? (isEditMode ? 'Updating...' : 'Creating...') : (isEditMode ? 'Update Subject' : 'Create Subject')}
         </Button>
       </form>
     </Form>

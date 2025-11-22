@@ -62,7 +62,11 @@ const SessionToggle = ({ subjectId }: { subjectId: string }) => {
   );
 };
 
-export const columns: ColumnDef<Subject>[] = [
+type GetColumnsProps = {
+  onEdit: (subject: Subject) => void;
+}
+
+export const getColumns = ({ onEdit }: GetColumnsProps): ColumnDef<Subject>[] => [
   {
     accessorKey: "name",
     header: ({ column }) => {
@@ -90,13 +94,12 @@ export const columns: ColumnDef<Subject>[] = [
     ),
   },
   {
-    accessorKey: "schoolYear",
+    accessorKey: "schoolYearName",
     header: "School Year",
   },
   {
-    accessorKey: "yearLevel",
+    accessorKey: "yearLevelName",
     header: "Year Level",
-    cell: ({ row }) => <span>{row.original.yearLevel}</span>
   },
    {
     accessorKey: "block",
@@ -126,7 +129,7 @@ export const columns: ColumnDef<Subject>[] = [
               <DropdownMenuItem asChild>
                 <Link href={`/admin/subjects/${subject.id}`}>Take Attendance</Link>
               </DropdownMenuItem>
-              <DropdownMenuItem>Edit Subject</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onEdit(subject)}>Edit Subject</DropdownMenuItem>
               <DropdownMenuItem className="text-destructive focus:text-destructive-foreground focus:bg-destructive">Delete Subject</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -135,4 +138,3 @@ export const columns: ColumnDef<Subject>[] = [
     },
   },
 ];
-    
