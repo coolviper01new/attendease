@@ -137,7 +137,7 @@ export default function StudentDashboardPage() {
                </p>
             </CardContent>
             <CardFooter>
-              {isClient && (
+              {!isClient ? null : (
                   <QrCodeDialog 
                     studentId={student.id} 
                     subjectId={subject.id} 
