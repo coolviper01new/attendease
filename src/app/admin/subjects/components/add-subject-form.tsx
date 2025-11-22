@@ -351,7 +351,14 @@ export function AddSubjectForm({ onSuccess, subject }: AddSubjectFormProps) {
                         render={({ field }) => (
                           <FormItem>
                             <FormControl>
-                              <Input placeholder="Room" {...field} />
+                              <Input
+                                placeholder="Room"
+                                {...field}
+                                onBlur={(e) => {
+                                  field.onBlur();
+                                  form.setValue(`schedules.${fieldIndex}.room`, e.target.value.toUpperCase());
+                                }}
+                              />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
