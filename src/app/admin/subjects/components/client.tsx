@@ -14,6 +14,9 @@ import {
   getPaginationRowModel,
   getSortedRowModel,
   useReactTable,
+  getGroupedRowModel,
+  getExpandedRowModel,
+  Row,
 } from "@tanstack/react-table";
 
 import {
@@ -28,6 +31,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { getColumns } from "./columns";
 import type { Subject } from "@/lib/types";
+import { ChevronDown, ChevronRight } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 
 interface SubjectClientProps {
   data: Subject[];
@@ -41,6 +46,8 @@ export function SubjectClient({ data, isLoading, onEdit, onRefresh }: SubjectCli
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
     []
   );
+  const [grouping, setGrouping] = React.useState<string[]>(['name']);
+  const [expanded, setExpanded] = React.useState({});
 
   const columns = React.useMemo(() => getColumns({ onEdit, allSubjects: data, onRefresh }), [onEdit, data, onRefresh]);
   
@@ -49,13 +56,19 @@ export function SubjectClient({ data, isLoading, onEdit, onRefresh }: SubjectCli
     columns,
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
+    onGroupingChange: setGrouping,
+    onExpandedChange: setExpanded,
     getCoreRowModel: getCoreRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
+    getGroupedRowModel: getGroupedRowModel(),
+    getExpandedRowModel: getExpandedRowModel(),
     state: {
       sorting,
       columnFilters,
+      grouping,
+      expanded,
     },
   });
 
@@ -78,7 +91,7 @@ export function SubjectClient({ data, isLoading, onEdit, onRefresh }: SubjectCli
               <TableRow key={headerGroup.id}>
                 {headerGroup.headers.map((header) => {
                   return (
-                    <TableHead key={header.id}>
+                    <TableHead key={header.id} style={{ width: header.getSize() !== 150 ? header.getSize() : undefined }}>
                       {header.isPlaceholder
                         ? null
                         : flexRender(
@@ -105,10 +118,34 @@ export function SubjectClient({ data, isLoading, onEdit, onRefresh }: SubjectCli
                   data-state={row.getIsSelected() && "selected"}
                 >
                   {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
-                      {flexRender(
-                        cell.column.columnDef.cell,
-                        cell.getContext()
+                     <TableCell key={cell.id}>
+                      {cell.getIsGrouped() ? (
+                        <div className="flex items-center gap-2">
+                           <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={row.getToggleExpandedHandler()}
+                            className="h-6 w-6"
+                            >
+                            {row.getIsExpanded() ? <ChevronDown /> : <ChevronRight />}
+                          </Button>
+                          {flexRender(
+                            cell.column.columnDef.cell,
+                            cell.getContext()
+                          )}
+                           ({row.subRows.length})
+                        </div>
+                      ) : cell.getIsAggregated() ? (
+                        flexRender(
+                          cell.column.columnDef.aggregatedCell ??
+                            cell.column.columnDef.cell,
+                          cell.getContext()
+                        )
+                      ) : cell.getIsPlaceholder() ? null : (
+                        flexRender(
+                          cell.column.columnDef.cell,
+                          cell.getContext()
+                        )
                       )}
                     </TableCell>
                   ))}

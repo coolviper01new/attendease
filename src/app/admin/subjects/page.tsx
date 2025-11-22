@@ -57,7 +57,7 @@ export default function AdminSubjectsPage() {
         description="Manage school subjects and attendance sessions."
       >
         <Button onClick={handleAddNew}>
-          <PlusCircle className="mr-2 h-4 w-4" /> Add New
+          <PlusCircle className="mr-2 h-4 w-4" /> Add New Subject
         </Button>
       </PageHeader>
 
@@ -69,14 +69,13 @@ export default function AdminSubjectsPage() {
       }}>
           <DialogContent className="sm:max-w-xl">
             <DialogHeader>
-              <DialogTitle>{editingSubject ? 'Edit Subject' : 'Create New Subject(s)'}</DialogTitle>
+              <DialogTitle>{editingSubject ? 'Edit Subject' : 'Create New Subject'}</DialogTitle>
               <DialogDescription>
-                {editingSubject ? 'Update the details for this subject and all its blocks.' : 'Fill out the form below to add a new subject to the system.'}
+                {editingSubject ? 'Update the details for this subject.' : 'Fill out the form below to add a new subject to the system.'}
               </DialogDescription>
             </DialogHeader>
             <AddSubjectForm 
                 subject={editingSubject}
-                allSubjects={combinedSubjects} 
                 onSuccess={handleSuccess}
              />
           </DialogContent>

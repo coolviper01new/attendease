@@ -24,6 +24,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
   DropdownMenuSeparator,
+  DropdownMenuGroup,
 } from "@/components/ui/dropdown-menu";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
@@ -198,7 +199,7 @@ const StartEnrollmentAction = ({ subject, allSubjects, onStarted }: { subject: S
                 <AlertDialogHeader>
                     <AlertDialogTitle>Are you sure you want to start enrollment?</AlertDialogTitle>
                     <AlertDialogDescription>
-                        This action will open enrollment for all blocks of {subject.name}. Once started, you will not be able to change the number of blocks for this subject. You can still edit the schedule. This action cannot be undone.
+                        This will open enrollment for all related blocks of {subject.name}. You will no longer be able to edit the subject code or block name after this. Schedules can still be changed. This action cannot be undone.
                     </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
@@ -219,6 +220,46 @@ type GetColumnsProps = {
   onRefresh: () => void;
 }
 
+
+const ActionsCell = ({ row, onEdit, allSubjects, onRefresh }: { row: any, onEdit: (subject: Subject) => void, allSubjects: Subject[], onRefresh: () => void }) => {
+    const subject = row.original;
+    const groupedSubjects = useMemo(() => groupBy(allSubjects, 'code'), [allSubjects]);
+    const relatedBlocks = groupedSubjects[subject.code] || [];
+    
+    // Find the subject that represents the first block to ensure consistent actions
+    const representativeSubject = relatedBlocks.sort((a,b) => a.block.localeCompare(b.block))[0] || subject;
+
+    if (subject.id !== representativeSubject.id) {
+        return null; // Only show actions on the first representative row of the group
+    }
+
+    return (
+      <div className="text-right">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" className="h-8 w-8 p-0">
+              <span className="sr-only">Open menu</span>
+              <MoreHorizontal className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuLabel>{subject.name}</DropdownMenuLabel>
+            <DropdownMenuGroup>
+                <DropdownMenuItem onClick={() => onEdit(subject)}>Edit Subject</DropdownMenuItem>
+                <StartEnrollmentAction subject={representativeSubject} allSubjects={allSubjects} onStarted={onRefresh} />
+                <EnrollmentQrCodeDialog subject={representativeSubject} allSubjects={allSubjects} />
+            </DropdownMenuGroup>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem asChild>
+              <Link href={`/admin/subjects/${subject.id}`}>View Attendance</Link>
+            </DropdownMenuItem>
+             <DropdownMenuItem className="text-destructive focus:text-destructive-foreground focus:bg-destructive">Delete Subject</DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+    );
+};
+
 export const getColumns = ({ onEdit, allSubjects, onRefresh }: GetColumnsProps): ColumnDef<Subject>[] => [
   {
     accessorKey: "name",
@@ -237,19 +278,15 @@ export const getColumns = ({ onEdit, allSubjects, onRefresh }: GetColumnsProps):
       <div className="pl-4">
         <div className="font-medium">{row.original.name}</div>
         <div className="text-xs text-muted-foreground">{row.original.code}</div>
-        <div className="text-xs text-muted-foreground truncate max-w-[200px]">{row.original.description}</div>
       </div>
     ),
+    sortingFn: 'text',
+    enableHiding: false,
   },
   {
-    accessorKey: "credits",
-    header: "Credits",
-    cell: ({row}) => <div className="text-center">{row.original.credits}</div>
-  },
-   {
     accessorKey: "block",
     header: "Block",
-     cell: ({ row }) => <Badge variant="outline">{row.original.block}</Badge>,
+    cell: ({ row }) => <Badge variant="outline">{row.original.block}</Badge>,
   },
   {
       id: "schedules",
@@ -284,6 +321,11 @@ export const getColumns = ({ onEdit, allSubjects, onRefresh }: GetColumnsProps):
         )
       }
   },
+    {
+    accessorKey: "credits",
+    header: () => <div className="text-center">Credits</div>,
+    cell: ({row}) => <div className="text-center">{row.original.credits}</div>
+  },
   {
     id: "enrollmentStatus",
     header: "Enrollment",
@@ -305,32 +347,7 @@ export const getColumns = ({ onEdit, allSubjects, onRefresh }: GetColumnsProps):
   },
   {
     id: "actions",
-    cell: ({ row }) => {
-      const subject = row.original;
-      return (
-        <div className="text-right">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="h-8 w-8 p-0">
-                <span className="sr-only">Open menu</span>
-                <MoreHorizontal className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuLabel>Actions</DropdownMenuLabel>
-              <DropdownMenuItem asChild>
-                <Link href={`/admin/subjects/${subject.id}`}>Take Attendance</Link>
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onEdit(subject)}>Edit Subject</DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <EnrollmentQrCodeDialog subject={subject} allSubjects={allSubjects} />
-              <StartEnrollmentAction subject={subject} allSubjects={allSubjects} onStarted={onRefresh} />
-              <DropdownMenuSeparator />
-              <DropdownMenuItem className="text-destructive focus:text-destructive-foreground focus:bg-destructive">Delete Subject</DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      );
-    },
+    cell: (props) => <ActionsCell {...props} onEdit={onEdit} allSubjects={allSubjects} onRefresh={onRefresh} />,
   },
 ];
+
