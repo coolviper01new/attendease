@@ -214,13 +214,15 @@ service cloud.firestore {
     /**
      * @description Manages attendance sessions for a subject.
      * @path /subjects/{subjectId}/attendanceSessions/{attendanceSessionId}
-     * @allow (get, list) Any signed-in user can read session data to check for active sessions.
+     * @allow (get) Any signed-in user can read session data to check for active sessions.
+     * @allow (list) Only admins can list sessions. This supports filtered queries from admin UIs.
      * @allow (create, update, delete) Only admins can create or manage attendance sessions.
      * @deny (create) A student cannot start an attendance session.
      * @principle Restricts management of sensitive operations to admins, while allowing read access for participants.
      */
     match /subjects/{subjectId}/attendanceSessions/{attendanceSessionId} {
-      allow get, list: if isSignedIn();
+      allow get: if isSignedIn();
+      allow list: if isAdmin();
       allow create: if isAdmin();
       allow update, delete: if isAdmin() && isExistingDoc();
 
@@ -244,5 +246,3 @@ service cloud.firestore {
     }
   }
 }
-
-    
