@@ -24,13 +24,13 @@ const nextConfig: NextConfig = {
         pathname: '/**',
       },
       {
-        protocol: 'https',
+        protocol: 'https' as const,
         hostname: 'picsum.photos',
         port: '',
         pathname: '/**',
       },
       {
-        protocol: 'https',
+        protocol: 'https' as const,
         hostname: 'api.qrserver.com',
         port: '',
         pathname: '/**',
@@ -38,16 +38,13 @@ const nextConfig: NextConfig = {
     ],
   },
   webpack: (config, { isServer }) => {
-    // This is a workaround for a bug in Next.js.
-    // The issue is that the 'child_process' module is not available in the browser.
-    // This is a problem because the 'google-auth-library' package uses it.
     if (!isServer) {
+      // Don't bundle Node.js built-in modules for the client
       config.externals.push({
         'child_process': 'commonjs child_process',
         'fs': 'commonjs fs'
       });
     }
-
     return config;
   }
 };
