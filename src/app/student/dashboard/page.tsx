@@ -12,7 +12,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { QrCode, Clock, BookOpen, AlertTriangle, CalendarCheck, Info, CheckCircle2 } from 'lucide-react';
+import { QrCode, Clock, BookOpen, AlertTriangle, CalendarCheck, Info, CheckCircle2, ListChecks } from 'lucide-react';
 import Image from 'next/image';
 import {
   Dialog,
@@ -31,6 +31,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
+import { AttendanceDialog } from './components/attendance-dialog';
 
 const QrCodeDialog = ({
   studentId,
@@ -127,6 +128,7 @@ const SubjectCard = ({ subject, student, isClient, isDeviceRegistered, isCurrent
 }) => {
     const firestore = useFirestore();
     const [isQrDialogOpen, setIsQrDialogOpen] = useState(false);
+    const [isAttendanceDialogOpen, setIsAttendanceDialogOpen] = useState(false);
     const [isConfirmed, setIsConfirmed] = useState(false);
     const [countdown, setCountdown] = useState(5);
     
@@ -242,8 +244,14 @@ const SubjectCard = ({ subject, student, isClient, isDeviceRegistered, isCurrent
                 </div>
               ))}
             </CardContent>
-            <CardFooter>
+            <CardFooter className='flex-col gap-2 items-stretch'>
               {renderFooter()}
+               <AttendanceDialog 
+                subject={subject} 
+                student={student}
+                isOpen={isAttendanceDialogOpen}
+                onOpenChange={setIsAttendanceDialogOpen}
+              />
             </CardFooter>
           </Card>
     )
@@ -457,3 +465,5 @@ export default function StudentDashboardPage() {
     </>
   );
 }
+
+    

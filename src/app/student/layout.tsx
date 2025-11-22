@@ -64,13 +64,6 @@ function StudentHeader() {
             >
               <Link href="/student/dashboard">My Subjects</Link>
             </Button>
-            <Button
-              variant="ghost"
-              asChild
-              className="text-sm font-medium text-muted-foreground transition-colors hover:text-primary"
-            >
-              <Link href="/student/attendance">My Attendance</Link>
-            </Button>
              <Button
               variant="ghost"
               asChild
@@ -155,3 +148,5 @@ export default function StudentLayout({
     </div>
   );
 }
+
+    
