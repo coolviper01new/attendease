@@ -79,7 +79,6 @@ export function useCollection<T = any>(
     setIsLoading(true);
     setError(null);
 
-    // Directly use memoizedTargetRefOrQuery as it's assumed to be the final query
     const unsubscribe = onSnapshot(
       memoizedTargetRefOrQuery,
       (snapshot: QuerySnapshot<DocumentData>) => {
@@ -100,15 +99,20 @@ export function useCollection<T = any>(
                 ? (memoizedTargetRefOrQuery as CollectionReference).path
                 : (memoizedTargetRefOrQuery as unknown as InternalQuery)._query.path.canonicalString()
 
-            const contextualError = new FirestorePermissionError({
-            operation: 'list',
-            path,
-            })
-
-            setError(contextualError)
-            
-            // trigger global error propagation
-            errorEmitter.emit('permission-error', contextualError);
+            if (path) { // Only create and emit error if path is valid
+                const contextualError = new FirestorePermissionError({
+                    operation: 'list',
+                    path,
+                })
+    
+                setError(contextualError)
+                
+                // trigger global error propagation
+                errorEmitter.emit('permission-error', contextualError);
+            } else {
+                // Fallback for cases where path is somehow null/undefined from the query object
+                setError(error);
+            }
         } else {
              // Fallback for unexpected cases where the query is null but an error still occurs.
             setError(error);
