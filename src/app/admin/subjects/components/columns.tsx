@@ -81,6 +81,9 @@ export const columns: ColumnDef<Subject>[] = [
         <div className="font-medium">{row.original.name}</div>
         <div className="text-xs text-muted-foreground">{row.original.code}</div>
         <div className="text-xs text-muted-foreground truncate max-w-xs">{row.original.description}</div>
+        <div className="text-xs text-muted-foreground mt-1">
+            {row.original.schedule.day}, {row.original.schedule.startTime}-{row.original.schedule.endTime} | Room: {row.original.schedule.room}
+        </div>
       </div>
     ),
   },

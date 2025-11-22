@@ -1,4 +1,5 @@
 
+
 export type SchoolYear = {
   id: string;
   name: string;
