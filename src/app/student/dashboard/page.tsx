@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -11,7 +12,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { QrCode, Clock, BookOpen, AlertTriangle, CalendarCheck, Info } from 'lucide-react';
+import { QrCode, Clock, BookOpen, AlertTriangle, CalendarCheck, Info, CheckCircle2 } from 'lucide-react';
 import Image from 'next/image';
 import {
   Dialog,
@@ -25,7 +26,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 import { useUser, useFirestore, useDoc, useCollection, useMemoFirebase } from '@/firebase';
 import { doc, collection, query, where, getDocs, updateDoc, getDoc } from 'firebase/firestore';
-import type { Student, Subject, Registration, Schedule, AttendanceSession } from '@/lib/types';
+import type { Student, Subject, Registration, Schedule, AttendanceSession, Attendance } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
 
@@ -67,7 +68,7 @@ const QrCodeDialog = ({
   if (!activeSession) {
      return (
       <Alert className="mt-4 text-center">
-        <AlertTriangle className="h-4 w-4" />
+        <Info className="h-4 w-4" />
         <AlertTitle>No Active Session</AlertTitle>
         <AlertDescription>
           There is no active attendance session for this subject right now.
@@ -119,11 +120,23 @@ const SubjectCard = ({ subject, student, isClient, isDeviceRegistered, isCurrent
     isToday?: boolean;
 }) => {
     const firestore = useFirestore();
+    
     const activeSessionQuery = useMemoFirebase(() => 
         query(collection(firestore, 'subjects', subject.id, 'attendanceSessions'), where('isActive', '==', true))
     , [firestore, subject.id]);
     const { data: activeSessions } = useCollection<AttendanceSession>(activeSessionQuery);
     const activeSession = activeSessions?.[0];
+
+    const sessionAttendanceQuery = useMemoFirebase(() => {
+      if (!activeSession || !student) return null;
+      return query(
+        collection(firestore, `subjects/${subject.id}/attendanceSessions/${activeSession.id}/attendance`),
+        where('studentId', '==', student.id)
+      );
+    }, [firestore, subject.id, activeSession, student]);
+    const { data: attendanceRecords } = useCollection<Attendance>(sessionAttendanceQuery);
+
+    const isPresent = !!(attendanceRecords && attendanceRecords.length > 0);
 
     const getTodaySchedules = (schedules: Schedule[] = [], day: string) => {
         return schedules.filter(sc => sc.day === day);
@@ -172,14 +185,22 @@ const SubjectCard = ({ subject, student, isClient, isDeviceRegistered, isCurrent
             </CardContent>
             <CardFooter>
               {isClient && student && (
-                <QrCodeDialog
-                  studentId={student.id}
-                  subject={subject}
-                  isDeviceRegistered={isDeviceRegistered}
-                  isCurrentDevice={isCurrentDevice}
-                  onRegister={onRegisterDevice}
-                  activeSession={activeSession}
-                />
+                <>
+                {isPresent ? (
+                    <Button disabled className="w-full bg-green-600/20 text-green-700 hover:bg-green-600/30">
+                        <CheckCircle2 className="mr-2 h-4 w-4" /> Present
+                    </Button>
+                ) : (
+                    <QrCodeDialog
+                        studentId={student.id}
+                        subject={subject}
+                        isDeviceRegistered={isDeviceRegistered}
+                        isCurrentDevice={isCurrentDevice}
+                        onRegister={onRegisterDevice}
+                        activeSession={activeSession}
+                    />
+                )}
+                </>
               )}
             </CardFooter>
           </Card>
@@ -391,5 +412,3 @@ export default function StudentDashboardPage() {
     </>
   );
 }
-
-    
