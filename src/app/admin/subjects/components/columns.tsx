@@ -4,7 +4,7 @@
 import { ColumnDef } from "@tanstack/react-table";
 import type { Subject, AttendanceSession as TAttendanceSession, Registration } from "@/lib/types";
 import { Button } from "@/components/ui/button";
-import { ArrowUpDown, MoreHorizontal, QrCode, PlayCircle, Clock, Trash2, Camera } from "lucide-react";
+import { ArrowUpDown, MoreHorizontal, QrCode, PlayCircle, Clock, Trash2, Camera, XCircle } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -144,24 +144,25 @@ const EnrollmentQrCodeDialog = ({ subject }: { subject: Subject }) => {
   );
 };
 
-const StartEnrollmentAction = ({ subject, onStarted }: { subject: Subject; onStarted: () => void }) => {
+const EnrollmentStatusAction = ({ subject, onStatusChange }: { subject: Subject; onStatusChange: () => void }) => {
     const firestore = useFirestore();
     const { toast } = useToast();
     const [isSubmitting, setIsSubmitting] = useState(false);
     
     const isEnrollmentOpen = subject.enrollmentStatus === 'open';
 
-    const handleStartEnrollment = async () => {
+    const handleToggleEnrollment = async () => {
         setIsSubmitting(true);
+        const newStatus = isEnrollmentOpen ? 'closed' : 'open';
         const subjectRef = doc(firestore, 'subjects', subject.id);
-        const subjectData = { enrollmentStatus: 'open' };
+        const subjectData = { enrollmentStatus: newStatus };
 
         updateDoc(subjectRef, subjectData).then(() => {
             toast({
-                title: 'Enrollment Started',
-                description: `Students can now enroll in ${subject.name} (${subject.block}).`,
+                title: `Enrollment ${newStatus === 'open' ? 'Started' : 'Closed'}`,
+                description: `Students can ${newStatus === 'open' ? 'now enroll in' : 'no longer enroll in'} ${subject.name} (${subject.block}).`,
             });
-            onStarted();
+            onStatusChange();
         }).catch(error => {
             errorEmitter.emit('permission-error', new FirestorePermissionError({
                 path: subjectRef.path,
@@ -173,31 +174,44 @@ const StartEnrollmentAction = ({ subject, onStarted }: { subject: Subject; onSta
         });
     };
 
+    const dialogDetails = isEnrollmentOpen ? {
+        triggerIcon: XCircle,
+        triggerText: "Close Enrollment",
+        title: "Are you sure you want to close enrollment?",
+        description: `This will prevent any new students from enrolling in ${subject.name} (${subject.block}). Existing students will not be affected.`,
+        actionText: "Confirm & Close",
+        triggerClassName: "text-destructive focus:bg-destructive/90 focus:text-destructive-foreground"
+    } : {
+        triggerIcon: PlayCircle,
+        triggerText: "Start Enrollment",
+        title: "Are you sure you want to start enrollment?",
+        description: `This will open enrollment for ${subject.name} (${subject.block}). You will no longer be able to edit the subject code or block name after this.`,
+        actionText: "Confirm & Start",
+        triggerClassName: ""
+    };
+
+
     return (
         <AlertDialog>
             <AlertDialogTrigger asChild>
                 <div 
-                  className="relative flex cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none transition-colors focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50"
-                  aria-disabled={isEnrollmentOpen}
-                  style={{ pointerEvents: isEnrollmentOpen ? 'none' : 'auto', opacity: isEnrollmentOpen ? 0.5 : 1 }}
-                  // Manually prevent click if disabled
-                  onClick={(e) => { if(isEnrollmentOpen) e.preventDefault(); }}
+                  className={`relative flex cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none transition-colors data-[disabled]:pointer-events-none data-[disabled]:opacity-50 ${dialogDetails.triggerClassName}`}
                 >
-                    <PlayCircle className="mr-2 h-4 w-4" />
-                    <span>Start Enrollment</span>
+                    <dialogDetails.triggerIcon className="mr-2 h-4 w-4" />
+                    <span>{dialogDetails.triggerText}</span>
                 </div>
             </AlertDialogTrigger>
             <AlertDialogContent>
                 <AlertDialogHeader>
-                    <AlertDialogTitle>Are you sure you want to start enrollment?</AlertDialogTitle>
+                    <AlertDialogTitle>{dialogDetails.title}</AlertDialogTitle>
                     <AlertDialogDescription>
-                        This will open enrollment for {subject.name} ({subject.block}). You will no longer be able to edit the subject code or block name after this. Schedules can still be changed.
+                       {dialogDetails.description}
                     </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                     <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleStartEnrollment} disabled={isSubmitting}>
-                        {isSubmitting ? 'Starting...' : 'Confirm & Start'}
+                    <AlertDialogAction onClick={handleToggleEnrollment} disabled={isSubmitting}>
+                        {isSubmitting ? 'Updating...' : dialogDetails.actionText}
                     </AlertDialogAction>
                 </AlertDialogFooter>
             </AlertDialogContent>
@@ -308,7 +322,7 @@ const ActionsCell = ({ row, onEdit, onRefresh }: { row: any, onEdit: (subject: S
               <DropdownMenuLabel>{subject.name} ({subject.block})</DropdownMenuLabel>
               <DropdownMenuGroup>
                   <DropdownMenuItem onClick={() => onEdit(subject)}>Edit Details</DropdownMenuItem>
-                  <StartEnrollmentAction subject={subject} onStarted={onRefresh} />
+                  <EnrollmentStatusAction subject={subject} onStatusChange={onRefresh} />
                   <EnrollmentQrCodeDialog subject={subject} />
               </DropdownMenuGroup>
               <DropdownMenuSeparator />
