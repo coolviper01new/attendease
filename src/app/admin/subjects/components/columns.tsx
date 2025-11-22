@@ -31,7 +31,7 @@ import { Label } from "@/components/ui/label";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
-import { collection, query, where, doc, updateDoc, writeBatch, collectionGroup, getDocs, deleteDoc } from "firebase/firestore";
+import { collection, query, where, doc, updateDoc, writeBatch, collectionGroup, getDocs, deleteDoc, addDoc, serverTimestamp } from "firebase/firestore";
 import {
   Dialog,
   DialogContent,
@@ -48,7 +48,7 @@ import { useToast } from "@/hooks/use-toast";
 import { errorEmitter } from "@/firebase/error-emitter";
 import { FirestorePermissionError } from "@/firebase/errors";
 
-const SessionToggle = ({ subjectId }: { subjectId: string }) => {
+const SessionToggle = ({ subjectId, onRefresh }: { subjectId: string, onRefresh: () => void }) => {
   const firestore = useFirestore();
   const sessionsQuery = useMemoFirebase(() => 
     query(collection(firestore, 'subjects', subjectId, 'attendanceSessions'), where('isActive', '==', true))
@@ -58,15 +58,20 @@ const SessionToggle = ({ subjectId }: { subjectId: string }) => {
   const activeSession = sessions?.[0];
 
   const handleToggle = async (checked: boolean) => {
-    // This is a simplified logic. A real app would need a more robust way
-    // to handle session creation and deactivation.
     if (checked && !activeSession) {
-      // Create a new session (logic to be implemented, maybe in a server action)
-      console.log(`Starting session for ${subjectId}`);
+      const newSessionSecret = `secret-${subjectId}-${Date.now()}`;
+      const sessionCollectionRef = collection(firestore, 'subjects', subjectId, 'attendanceSessions');
+      await addDoc(sessionCollectionRef, {
+        subjectId: subjectId,
+        startTime: serverTimestamp(),
+        isActive: true,
+        qrCodeSecret: newSessionSecret
+      });
+      onRefresh();
     } else if (!checked && activeSession) {
-      // Deactivate the current session
       const sessionRef = doc(firestore, 'subjects', subjectId, 'attendanceSessions', activeSession.id);
-      await updateDoc(sessionRef, { isActive: false });
+      await updateDoc(sessionRef, { isActive: false, endTime: serverTimestamp() });
+      onRefresh();
     }
   };
 
@@ -284,7 +289,7 @@ const ActionsCell = ({ row, onEdit, onRefresh }: { row: any, onEdit: (subject: S
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
              <DropdownMenuItem asChild>
-              <Link href={`/attendance/${subject.id}`} target="_blank" className="flex items-center gap-2">
+              <Link href={`/attendance/${subject.id}`} className="flex items-center gap-2">
                 <ExternalLink className="h-4 w-4" />
                 Open Attendance Scanner
               </Link>
@@ -399,7 +404,7 @@ export const getColumns = ({ onEdit, onRefresh }: GetColumnsProps): ColumnDef<Su
     header: "Session Status",
     cell: ({ row }) => {
         if (row.getIsGrouped()) return null;
-        return <SessionToggle subjectId={row.original.id} />
+        return <SessionToggle subjectId={row.original.id} onRefresh={onRefresh} />
     },
   },
   {
@@ -407,3 +412,5 @@ export const getColumns = ({ onEdit, onRefresh }: GetColumnsProps): ColumnDef<Su
     cell: (props) => <ActionsCell {...props} onEdit={onEdit} onRefresh={onRefresh} />,
   },
 ];
+
+    
