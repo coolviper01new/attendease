@@ -5,7 +5,18 @@
 import { ColumnDef } from "@tanstack/react-table";
 import type { Subject, AttendanceSession as TAttendanceSession } from "@/lib/types";
 import { Button } from "@/components/ui/button";
-import { ArrowUpDown, MoreHorizontal, QrCode } from "lucide-react";
+import { ArrowUpDown, MoreHorizontal, QrCode, PlayCircle } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,9 +30,7 @@ import { Label } from "@/components/ui/label";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
-import { collection, query, where } from "firebase/firestore";
-import { doc } from "firebase/firestore";
-import { updateDoc } from "firebase/firestore";
+import { collection, query, where, doc, updateDoc, writeBatch } from "firebase/firestore";
 import {
   Dialog,
   DialogContent,
@@ -34,6 +43,7 @@ import Image from "next/image";
 import { useState, useMemo } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { groupBy } from "lodash";
+import { useToast } from "@/hooks/use-toast";
 
 const SessionToggle = ({ subjectId }: { subjectId: string }) => {
   const firestore = useFirestore();
@@ -136,12 +146,80 @@ const EnrollmentQrCodeDialog = ({ subject, allSubjects }: { subject: Subject; al
   );
 };
 
+const StartEnrollmentAction = ({ subject, allSubjects, onStarted }: { subject: Subject; allSubjects: Subject[], onStarted: () => void }) => {
+    const firestore = useFirestore();
+    const { toast } = useToast();
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    
+    // Group all subjects by code to find related blocks
+    const groupedSubjects = useMemo(() => groupBy(allSubjects, 'code'), [allSubjects]);
+    const relatedBlocks = groupedSubjects[subject.code] || [];
+    
+    const isEnrollmentOpen = subject.enrollmentStatus === 'open';
+
+    const handleStartEnrollment = async () => {
+        setIsSubmitting(true);
+        try {
+            const batch = writeBatch(firestore);
+            relatedBlocks.forEach(block => {
+                const subjectRef = doc(firestore, 'subjects', block.id);
+                batch.update(subjectRef, { enrollmentStatus: 'open' });
+            });
+            await batch.commit();
+            toast({
+                title: 'Enrollment Started',
+                description: `Students can now enroll in all blocks for ${subject.name}.`,
+            });
+            onStarted();
+        } catch (error) {
+            console.error("Error starting enrollment: ", error);
+            toast({
+                variant: 'destructive',
+                title: 'Error',
+                description: 'Could not start enrollment. Please try again.',
+            });
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    return (
+        <AlertDialog>
+            <AlertDialogTrigger asChild>
+                <div className="relative flex cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none transition-colors focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50"
+                    aria-disabled={isEnrollmentOpen}
+                    style={{ pointerEvents: isEnrollmentOpen ? 'none' : 'auto', opacity: isEnrollmentOpen ? 0.5 : 1 }}
+                >
+                    <PlayCircle className="mr-2 h-4 w-4" />
+                    <span>Start Enrollment</span>
+                </div>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle>Are you sure you want to start enrollment?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        This action will open enrollment for all blocks of {subject.name}. Once started, you will not be able to change the number of blocks for this subject. You can still edit the schedule. This action cannot be undone.
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleStartEnrollment} disabled={isSubmitting}>
+                        {isSubmitting ? 'Starting...' : 'Confirm & Start'}
+                    </AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
+    );
+};
+
+
 type GetColumnsProps = {
   onEdit: (subject: Subject) => void;
   allSubjects: Subject[];
+  onRefresh: () => void;
 }
 
-export const getColumns = ({ onEdit, allSubjects }: GetColumnsProps): ColumnDef<Subject>[] => [
+export const getColumns = ({ onEdit, allSubjects, onRefresh }: GetColumnsProps): ColumnDef<Subject>[] => [
   {
     accessorKey: "name",
     header: ({ column }) => {
@@ -189,6 +267,20 @@ export const getColumns = ({ onEdit, allSubjects }: GetColumnsProps): ColumnDef<
       )
   },
   {
+    id: "enrollmentStatus",
+    header: "Enrollment",
+    cell: ({ row }) => {
+        const status = row.original.enrollmentStatus;
+        return (
+            <Badge variant={status === 'open' ? 'default' : 'secondary'}
+                className={status === 'open' ? 'bg-green-500/20 text-green-600' : ''}
+            >
+                {status}
+            </Badge>
+        )
+    }
+  },
+  {
     id: "sessionStatus",
     header: "Session Status",
     cell: ({ row }) => <SessionToggle subjectId={row.original.id} />,
@@ -214,6 +306,7 @@ export const getColumns = ({ onEdit, allSubjects }: GetColumnsProps): ColumnDef<
               <DropdownMenuItem onClick={() => onEdit(subject)}>Edit Subject</DropdownMenuItem>
               <DropdownMenuSeparator />
               <EnrollmentQrCodeDialog subject={subject} allSubjects={allSubjects} />
+              <StartEnrollmentAction subject={subject} allSubjects={allSubjects} onStarted={onRefresh} />
               <DropdownMenuSeparator />
               <DropdownMenuItem className="text-destructive focus:text-destructive-foreground focus:bg-destructive">Delete Subject</DropdownMenuItem>
             </DropdownMenuContent>

@@ -46,7 +46,8 @@ const subjectSchema = z.object({
   schoolYear: z.string().regex(schoolYearRegex, { message: 'Invalid format. Use YYYY-YYYY.' }),
   yearLevel: z.string({ required_error: 'Please select a year level.' }),
   blockCount: z.coerce.number().min(1, { message: 'At least one block is required.' }),
-  schedules: z.array(scheduleSchema).min(1, { message: 'At least one schedule is required.' })
+  schedules: z.array(scheduleSchema).min(1, { message: 'At least one schedule is required.' }),
+  enrollmentStatus: z.enum(['closed', 'open']),
 });
 
 type SubjectFormValues = z.infer<typeof subjectSchema>;
@@ -69,6 +70,7 @@ export function AddSubjectForm({ onSuccess, subject, allSubjects }: AddSubjectFo
   // In edit mode, find all related blocks to determine the count
   const existingBlocksForCode = isEditMode ? allSubjects.filter(s => s.code === subject.code) : [];
   const initialBlockCount = isEditMode ? existingBlocksForCode.length : 1;
+  const isEnrollmentOpen = isEditMode && subject.enrollmentStatus === 'open';
 
   const form = useForm<SubjectFormValues>({
     resolver: zodResolver(subjectSchema),
@@ -80,6 +82,7 @@ export function AddSubjectForm({ onSuccess, subject, allSubjects }: AddSubjectFo
       code: '',
       description: '',
       blockCount: 1,
+      enrollmentStatus: 'closed',
     },
   });
   
@@ -94,6 +97,7 @@ export function AddSubjectForm({ onSuccess, subject, allSubjects }: AddSubjectFo
         yearLevel: subject.yearLevel,
         schedules: subject.schedules,
         blockCount: relatedBlocks.length,
+        enrollmentStatus: subject.enrollmentStatus || 'closed',
       });
     } else {
         form.reset({
@@ -104,6 +108,7 @@ export function AddSubjectForm({ onSuccess, subject, allSubjects }: AddSubjectFo
             code: '',
             description: '',
             blockCount: 1,
+            enrollmentStatus: 'closed',
         })
     }
   }, [subject, form, isEditMode, allSubjects]);
@@ -172,42 +177,53 @@ export function AddSubjectForm({ onSuccess, subject, allSubjects }: AddSubjectFo
             const snapshot = await getDocs(relatedSubjectsQuery);
             const existingSubjects = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Subject));
             const existingBlockCount = existingSubjects.length;
+            
+            // Core data that can change (but not block-specific data)
+            const updatedSharedData: any = {
+                name: values.name,
+                description: values.description,
+                schoolYear: values.schoolYear,
+                yearLevel: values.yearLevel,
+                schedules: values.schedules,
+            };
 
             // Update all existing blocks with new shared data
             existingSubjects.forEach(existingSub => {
-                batch.update(doc(subjectsRef, existingSub.id), subjectData);
+                batch.update(doc(subjectsRef, existingSub.id), updatedSharedData);
             });
 
-            if (blockCount > existingBlockCount) {
-                // Add new blocks
-                for (let i = existingBlockCount + 1; i <= blockCount; i++) {
-                    const newDocRef = doc(subjectsRef);
-                    const blockName = `${values.code}-B${i}`;
-                    batch.set(newDocRef, { ...subjectData, block: blockName });
-                }
-            } else if (blockCount < existingBlockCount) {
-                // Remove blocks, starting from the highest number
-                const blocksToRemove = existingSubjects.sort((a, b) => b.block.localeCompare(a.block)).slice(0, existingBlockCount - blockCount);
-                
-                let undeletableBlocks: string[] = [];
-
-                for (const blockToRemove of blocksToRemove) {
-                    const registrationsQuery = query(collectionGroup(firestore, 'registrations'), where('subjectId', '==', blockToRemove.id));
-                    const registrationsSnapshot = await getDocs(registrationsQuery);
-
-                    if (registrationsSnapshot.empty) {
-                        batch.delete(doc(subjectsRef, blockToRemove.id));
-                    } else {
-                        undeletableBlocks.push(blockToRemove.block);
+            if (!isEnrollmentOpen) {
+                if (blockCount > existingBlockCount) {
+                    // Add new blocks
+                    for (let i = existingBlockCount + 1; i <= blockCount; i++) {
+                        const newDocRef = doc(subjectsRef);
+                        const blockName = `${values.code}-B${i}`;
+                        batch.set(newDocRef, { ...updatedSharedData, code: values.code, block: blockName, enrollmentStatus: 'closed' });
                     }
-                }
-                
-                if (undeletableBlocks.length > 0) {
-                    toast({
-                        variant: 'destructive',
-                        title: 'Deletion Prevented',
-                        description: `Could not delete block(s) ${undeletableBlocks.join(', ')} because students are enrolled.`,
-                    });
+                } else if (blockCount < existingBlockCount) {
+                    // Remove blocks, starting from the highest number
+                    const blocksToRemove = existingSubjects.sort((a, b) => b.block.localeCompare(a.block)).slice(0, existingBlockCount - blockCount);
+                    
+                    let undeletableBlocks: string[] = [];
+
+                    for (const blockToRemove of blocksToRemove) {
+                        const registrationsQuery = query(collectionGroup(firestore, 'registrations'), where('subjectId', '==', blockToRemove.id));
+                        const registrationsSnapshot = await getDocs(registrationsQuery);
+
+                        if (registrationsSnapshot.empty) {
+                            batch.delete(doc(subjectsRef, blockToRemove.id));
+                        } else {
+                            undeletableBlocks.push(blockToRemove.block);
+                        }
+                    }
+                    
+                    if (undeletableBlocks.length > 0) {
+                        toast({
+                            variant: 'destructive',
+                            title: 'Deletion Prevented',
+                            description: `Could not delete block(s) ${undeletableBlocks.join(', ')} because students are enrolled.`,
+                        });
+                    }
                 }
             }
             await batch.commit();
@@ -220,7 +236,7 @@ export function AddSubjectForm({ onSuccess, subject, allSubjects }: AddSubjectFo
             for (let i = 1; i <= blockCount; i++) {
                 const newDocRef = doc(subjectsRef);
                 const blockName = `${values.code}-B${i}`;
-                batch.set(newDocRef, { ...subjectData, block: blockName });
+                batch.set(newDocRef, { ...subjectData, block: blockName, enrollmentStatus: 'closed' });
             }
             await batch.commit();
             toast({
@@ -329,11 +345,11 @@ export function AddSubjectForm({ onSuccess, subject, allSubjects }: AddSubjectFo
                 <FormItem>
                 <FormLabel>Number of Blocks</FormLabel>
                  <FormControl>
-                  <Input type="number" min="1" {...field} />
+                  <Input type="number" min="1" {...field} disabled={isEnrollmentOpen} />
                 </FormControl>
                 <FormDescription>
                     {isEditMode 
-                        ? "Adjust the number of blocks. New blocks will be added, and empty blocks will be removed."
+                        ? (isEnrollmentOpen ? "Number of blocks cannot be changed after enrollment has started." : "Adjust the number of blocks. New blocks will be added, and empty blocks will be removed.")
                         : "Enter the number of blocks. The system will create separate entries like IT101-B1, IT101-B2, etc."
                     }
                 </FormDescription>

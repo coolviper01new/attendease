@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import * as React from "react";
@@ -32,15 +33,16 @@ interface SubjectClientProps {
   data: Subject[];
   isLoading: boolean;
   onEdit: (subject: Subject) => void;
+  onRefresh: () => void;
 }
 
-export function SubjectClient({ data, isLoading, onEdit }: SubjectClientProps) {
+export function SubjectClient({ data, isLoading, onEdit, onRefresh }: SubjectClientProps) {
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
     []
   );
 
-  const columns = React.useMemo(() => getColumns({ onEdit, allSubjects: data }), [onEdit, data]);
+  const columns = React.useMemo(() => getColumns({ onEdit, allSubjects: data, onRefresh }), [onEdit, data, onRefresh]);
   
   const table = useReactTable({
     data,

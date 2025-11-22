@@ -182,6 +182,11 @@
         "block": {
           "type": "string",
           "description": "The block or section for this subject instance."
+        },
+        "enrollmentStatus": {
+            "type": "string",
+            "description": "The enrollment status for the subject.",
+            "enum": ["closed", "open"]
         }
       },
       "required": [
@@ -191,7 +196,8 @@
         "schedules",
         "schoolYear",
         "yearLevel",
-        "block"
+        "block",
+        "enrollmentStatus"
       ]
     },
     "Registration": {

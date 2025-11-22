@@ -1,5 +1,6 @@
 
 
+
 export type SchoolYear = {
   id: string;
   name: string;
@@ -43,6 +44,7 @@ export type Subject = {
   block: string;
   schoolYear: string;
   yearLevel: string;
+  enrollmentStatus: 'closed' | 'open';
   schoolYearName?: string; // This might be deprecated if we are directly entering school year
   yearLevelName?: string; // This might be deprecated if we are directly entering year level
 };

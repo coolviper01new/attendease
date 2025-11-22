@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useMemo, useState } from "react";
@@ -83,7 +84,7 @@ export default function AdminSubjectsPage() {
 
       <Card>
         <CardContent>
-          <SubjectClient data={combinedSubjects} isLoading={isLoading} onEdit={handleEdit} />
+          <SubjectClient data={combinedSubjects} isLoading={isLoading} onEdit={handleEdit} onRefresh={forceRefresh} />
         </CardContent>
       </Card>
     </>
