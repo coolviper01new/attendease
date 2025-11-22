@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useForm, useFieldArray, Controller, UseFormSetValue } from 'react-hook-form';
+import { useForm, useFieldArray, Controller, UseFormSetValue, UseFormGetValues } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
@@ -74,7 +74,7 @@ interface AddSubjectFormProps {
   subject?: Subject | null;
 }
 
-const ScheduleArray = ({ control, setValue, name, label, description }: { control: any, setValue: UseFormSetValue<SubjectFormValues>, name: "lectureSchedules" | "labSchedules", label: string, description: string }) => {
+const ScheduleArray = ({ control, setValue, getValues, name, label, description }: { control: any, setValue: UseFormSetValue<SubjectFormValues>, getValues: UseFormGetValues<SubjectFormValues>, name: "lectureSchedules" | "labSchedules", label: string, description: string }) => {
     const { fields, append, remove, update } = useFieldArray({ control, name });
     const [alert, setAlert] = useState<{variant: 'default' | 'destructive', title: string, description: string} | null>(null);
 
@@ -88,7 +88,7 @@ const ScheduleArray = ({ control, setValue, name, label, description }: { contro
     };
 
     const handleCopySchedule = (targetDay: string) => {
-      const allFormSchedules = control.getValues(name) as { day: string; startTime: string; endTime: string; room: string}[];
+      const allFormSchedules = getValues(name) as { day: string; startTime: string; endTime: string; room: string}[];
       const targetDayOrder = daysOfWeek.indexOf(targetDay);
       
       let sourceSchedule = null;
@@ -443,6 +443,7 @@ export function AddSubjectForm({ onSuccess, subject }: AddSubjectFormProps) {
             <ScheduleArray 
                 control={form.control}
                 setValue={form.setValue}
+                getValues={form.getValues}
                 name="lectureSchedules"
                 label="Lecture Schedule"
                 description="Select the days and times for lecture classes."
@@ -473,6 +474,7 @@ export function AddSubjectForm({ onSuccess, subject }: AddSubjectFormProps) {
                  <ScheduleArray 
                     control={form.control}
                     setValue={form.setValue}
+                    getValues={form.getValues}
                     name="labSchedules"
                     label="Laboratory Schedule"
                     description="Select the days and times for laboratory classes."
