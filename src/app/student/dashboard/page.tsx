@@ -39,6 +39,8 @@ const QrCodeDialog = ({
   isCurrentDevice,
   onRegister,
   activeSession,
+  isOpen,
+  onOpenChange,
 }: {
   studentId: string;
   subject: Subject;
@@ -46,6 +48,8 @@ const QrCodeDialog = ({
   isCurrentDevice: boolean;
   onRegister: () => void;
   activeSession?: AttendanceSession;
+  isOpen: boolean;
+  onOpenChange: (isOpen: boolean) => void;
 }) => {
   if (!isDeviceRegistered) {
     return (
@@ -85,7 +89,7 @@ const QrCodeDialog = ({
   )}`;
 
   return (
-    <Dialog>
+    <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogTrigger asChild>
         <Button className="w-full">
           <QrCode className="mr-2 h-4 w-4" /> View QR Code
@@ -117,11 +121,14 @@ const SubjectCard = ({ subject, student, isClient, isDeviceRegistered, isCurrent
     student: Student | null;
     isClient: boolean;
     isDeviceRegistered: boolean;
-isCurrentDevice: boolean;
+    isCurrentDevice: boolean;
     onRegisterDevice: () => void;
     isToday?: boolean;
 }) => {
     const firestore = useFirestore();
+    const [isQrDialogOpen, setIsQrDialogOpen] = useState(false);
+    const [isConfirmed, setIsConfirmed] = useState(false);
+    const [countdown, setCountdown] = useState(5);
     
     const activeSessionQuery = useMemoFirebase(() => 
         query(collection(firestore, 'subjects', subject.id, 'attendanceSessions'), where('isActive', '==', true))
@@ -131,13 +138,32 @@ isCurrentDevice: boolean;
 
     const studentAttendanceDocRef = useMemoFirebase(() => {
         if (!activeSession || !student) return null;
-        // Assume the attendance document ID is the student's ID for a direct lookup
         return doc(firestore, `subjects/${subject.id}/attendanceSessions/${activeSession.id}/attendance`, student.id);
     }, [firestore, subject.id, activeSession, student]);
 
     const { data: attendanceRecord } = useDoc<Attendance>(studentAttendanceDocRef);
 
     const isPresent = !!attendanceRecord;
+
+     useEffect(() => {
+        if (isPresent && !isConfirmed) {
+            setIsConfirmed(true);
+            setIsQrDialogOpen(false); // Close QR dialog on confirmation
+            setCountdown(5);
+        }
+    }, [isPresent, isConfirmed]);
+
+    useEffect(() => {
+        let timer: NodeJS.Timeout;
+        if (isConfirmed && countdown > 0) {
+            timer = setInterval(() => {
+                setCountdown(prev => prev - 1);
+            }, 1000);
+        } else if (countdown === 0) {
+            setIsConfirmed(false); // Reset confirmation state
+        }
+        return () => clearInterval(timer);
+    }, [isConfirmed, countdown]);
 
     const getTodaySchedules = (schedules: Schedule[] = [], day: string) => {
         return schedules.filter(sc => sc.day === day);
@@ -150,6 +176,38 @@ isCurrentDevice: boolean;
     const schedulesToShow = isToday ? [...todayLecSchedules, ...todayLabSchedules] : subject.lectureSchedules;
     const labSchedulesToShow = isToday ? [] : subject.labSchedules;
 
+    const renderFooter = () => {
+        if (!isClient || !student) {
+            return null; // Or a skeleton/placeholder
+        }
+        if (isConfirmed) {
+            return (
+                <div className="w-full text-center p-4 bg-green-600/10 rounded-md">
+                    <p className='text-green-700 font-bold'>Attendance Recorded!</p>
+                    <p className='text-sm text-muted-foreground'>Closing in {countdown}s...</p>
+                </div>
+            );
+        }
+        if (isPresent) {
+             return (
+                <Button disabled className="w-full bg-green-600/20 text-green-700 hover:bg-green-600/30">
+                    <CheckCircle2 className="mr-2 h-4 w-4" /> Present
+                </Button>
+            );
+        }
+        return (
+            <QrCodeDialog
+                studentId={student.id}
+                subject={subject}
+                isDeviceRegistered={isDeviceRegistered}
+                isCurrentDevice={isCurrentDevice}
+                onRegister={onRegisterDevice}
+                activeSession={activeSession}
+                isOpen={isQrDialogOpen}
+                onOpenChange={setIsQrDialogOpen}
+            />
+        );
+    }
 
     return (
         <Card key={subject.id} className="flex flex-col hover:border-primary/50 transition-colors">
@@ -185,24 +243,7 @@ isCurrentDevice: boolean;
               ))}
             </CardContent>
             <CardFooter>
-              {isClient && student && (
-                <>
-                {isPresent ? (
-                    <Button disabled className="w-full bg-green-600/20 text-green-700 hover:bg-green-600/30">
-                        <CheckCircle2 className="mr-2 h-4 w-4" /> Present
-                    </Button>
-                ) : (
-                    <QrCodeDialog
-                        studentId={student.id}
-                        subject={subject}
-                        isDeviceRegistered={isDeviceRegistered}
-                        isCurrentDevice={isCurrentDevice}
-                        onRegister={onRegisterDevice}
-                        activeSession={activeSession}
-                    />
-                )}
-                </>
-              )}
+              {renderFooter()}
             </CardFooter>
           </Card>
     )
@@ -416,5 +457,3 @@ export default function StudentDashboardPage() {
     </>
   );
 }
-
-    
