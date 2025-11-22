@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import {
@@ -15,13 +15,17 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { AppWindow } from 'lucide-react';
-import { useAuth, useUser, useFirestore } from '@/firebase';
 import {
-  createUserWithEmailAndPassword,
-  onAuthStateChanged,
-} from 'firebase/auth';
-import { doc, setDoc } from 'firebase/firestore';
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { AppWindow } from 'lucide-react';
+import { useAuth, useFirestore } from '@/firebase';
+import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { doc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 
@@ -31,6 +35,14 @@ export default function RegisterPage() {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [role, setRole] = useState<'admin' | 'student'>('student');
+  
+  // Student fields
+  const [course, setCourse] = useState('');
+  const [studentNumber, setStudentNumber] = useState('');
+
+  // Admin (Faculty) field
+  const [facultyId, setFacultyId] = useState('');
+
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const router = useRouter();
@@ -39,11 +51,19 @@ export default function RegisterPage() {
   const { toast } = useToast();
 
   const handleRegister = async () => {
-    if (!firstName || !lastName || !email || !password) {
+    let missingFields = !firstName || !lastName || !email || !password;
+    if (role === 'student' && (!course || !studentNumber)) {
+        missingFields = true;
+    }
+    if (role === 'admin' && !facultyId) {
+        missingFields = true;
+    }
+
+    if (missingFields) {
       toast({
         variant: 'destructive',
         title: 'Missing Fields',
-        description: 'Please fill out all fields.',
+        description: 'Please fill out all required fields.',
       });
       return;
     }
@@ -56,13 +76,20 @@ export default function RegisterPage() {
       );
       const user = userCredential.user;
 
-      const userProfile = {
+      const userProfile: any = {
         id: user.uid,
         firstName,
         lastName,
         email: user.email,
         role,
       };
+
+      if (role === 'student') {
+        userProfile.course = course;
+        userProfile.studentNumber = studentNumber;
+      } else {
+        userProfile.facultyId = facultyId;
+      }
       
       const userDocRef = doc(firestore, 'users', user.uid);
       
@@ -99,7 +126,7 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-background">
+    <div className="flex items-center justify-center min-h-screen bg-background py-12">
       <Card className="w-full max-w-md mx-4">
         <CardHeader className="text-center">
           <div className="flex justify-center items-center mb-4">
@@ -118,7 +145,20 @@ export default function RegisterPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid gap-2">
+            <Label>I am a...</Label>
+            <RadioGroup defaultValue="student" value={role} onValueChange={(value: 'student' | 'admin') => setRole(value)} className="flex gap-4">
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="student" id="r-student" />
+                <Label htmlFor="r-student">Student</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="admin" id="r-admin" />
+                <Label htmlFor="r-admin">Teacher (Admin)</Label>
+              </div>
+            </RadioGroup>
+          </div>
+           <div className="grid grid-cols-2 gap-4">
             <div className="grid gap-2">
               <Label htmlFor="firstName">First Name</Label>
               <Input
@@ -161,19 +201,47 @@ export default function RegisterPage() {
               onChange={(e) => setPassword(e.target.value)}
             />
           </div>
-           <div className="grid gap-2">
-            <Label>Role</Label>
-            <RadioGroup defaultValue="student" value={role} onValueChange={(value: 'student' | 'admin') => setRole(value)} className="flex gap-4">
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="student" id="r-student" />
-                <Label htmlFor="r-student">Student</Label>
+         
+          {role === 'student' && (
+            <>
+              <div className="grid gap-2">
+                <Label htmlFor="studentNumber">Student Number</Label>
+                <Input
+                  id="studentNumber"
+                  placeholder="2024-00123"
+                  required
+                  value={studentNumber}
+                  onChange={(e) => setStudentNumber(e.target.value)}
+                />
               </div>
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="admin" id="r-admin" />
-                <Label htmlFor="r-admin">Teacher (Admin)</Label>
+              <div className="grid gap-2">
+                <Label htmlFor="course">Course</Label>
+                <Select onValueChange={setCourse} value={course}>
+                    <SelectTrigger id="course">
+                        <SelectValue placeholder="Select a course" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="BSIT">BSIT</SelectItem>
+                        <SelectItem value="BMMA">BMMA</SelectItem>
+                    </SelectContent>
+                </Select>
               </div>
-            </RadioGroup>
-          </div>
+            </>
+          )}
+
+          {role === 'admin' && (
+            <div className="grid gap-2">
+                <Label htmlFor="facultyId">Faculty ID #</Label>
+                <Input
+                    id="facultyId"
+                    placeholder="F-12345"
+                    required
+                    value={facultyId}
+                    onChange={(e) => setFacultyId(e.target.value)}
+                />
+            </div>
+          )}
+
         </CardContent>
         <CardFooter className="flex flex-col gap-4">
           <Button className="w-full" onClick={handleRegister} disabled={isSubmitting}>

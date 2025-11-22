@@ -335,6 +335,22 @@
         "role": {
           "type": "string",
           "description": "User's role (e.g., student, admin)."
+        },
+        "course": {
+          "type": "string",
+          "description": "The student's course (e.g., BSIT, BMMA).",
+          "enum": [
+            "BSIT",
+            "BMMA"
+          ]
+        },
+        "studentNumber": {
+          "type": "string",
+          "description": "The student's unique identification number."
+        },
+        "facultyId": {
+          "type": "string",
+          "description": "The faculty member's unique identification number."
         }
       },
       "required": [
