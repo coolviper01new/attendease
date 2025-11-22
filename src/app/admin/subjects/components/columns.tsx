@@ -4,7 +4,7 @@
 import { ColumnDef } from "@tanstack/react-table";
 import type { Subject, AttendanceSession as TAttendanceSession, Registration } from "@/lib/types";
 import { Button } from "@/components/ui/button";
-import { ArrowUpDown, MoreHorizontal, QrCode, PlayCircle, Clock, Trash2, Camera, XCircle } from "lucide-react";
+import { ArrowUpDown, MoreHorizontal, QrCode, PlayCircle, Clock, Trash2, Camera, XCircle, Users } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -46,6 +46,7 @@ import { groupBy } from "lodash";
 import { errorEmitter } from "@/firebase/error-emitter";
 import { FirestorePermissionError } from "@/firebase/errors";
 import { AttendanceScannerDialog } from "./attendance-scanner-dialog";
+import { AttendanceListDialog } from "./attendance-list-dialog";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 
@@ -294,6 +295,7 @@ type GetColumnsProps = {
 const ActionsCell = ({ row, onEdit, onRefresh }: { row: any, onEdit: (subject: Subject) => void, onRefresh: () => void }) => {
     const subject = row.original as Subject;
     const [isScannerOpen, setIsScannerOpen] = useState(false);
+    const [isAttendanceListOpen, setIsAttendanceListOpen] = useState(false);
     
     if (row.getIsGrouped()) {
         return null; 
@@ -306,6 +308,11 @@ const ActionsCell = ({ row, onEdit, onRefresh }: { row: any, onEdit: (subject: S
           open={isScannerOpen}
           onOpenChange={setIsScannerOpen}
           onRefresh={onRefresh}
+        />
+        <AttendanceListDialog 
+            subject={subject}
+            open={isAttendanceListOpen}
+            onOpenChange={setIsAttendanceListOpen}
         />
         <div className="text-right">
           <DropdownMenu>
@@ -327,6 +334,11 @@ const ActionsCell = ({ row, onEdit, onRefresh }: { row: any, onEdit: (subject: S
                 <Camera className="mr-2 h-4 w-4" />
                 Open Attendance Scanner
               </DropdownMenuItem>
+               <DropdownMenuItem onClick={() => setIsAttendanceListOpen(true)}>
+                <Users className="mr-2 h-4 w-4" />
+                View Attendance List
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
               <DeleteSubjectAction subject={subject} onDeleted={onRefresh} />
             </DropdownMenuContent>
           </DropdownMenu>
