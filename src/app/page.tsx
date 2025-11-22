@@ -44,8 +44,8 @@ export default function LandingPage() {
 
       <main className="flex-1">
         <section className="relative overflow-hidden bg-background">
-          <div className="container relative z-10 grid grid-cols-1 items-center gap-12 py-20 md:grid-cols-2 lg:py-28">
-            <div className="flex flex-col items-start gap-4">
+          <div className="container relative z-10 flex flex-col items-center justify-center gap-12 py-20 text-center lg:py-28">
+            <div className="flex flex-col items-center gap-4">
               <h1 className="text-4xl font-extrabold leading-tight tracking-tighter md:text-5xl lg:text-6xl font-headline text-white">
                 A smarter way to manage attendance.
               </h1>
@@ -60,16 +60,6 @@ export default function LandingPage() {
                   Learn More
                 </Button>
               </div>
-            </div>
-            <div className="relative flex items-center justify-center">
-                <Image
-                    src="https://picsum.photos/seed/robot/500/500"
-                    alt="AI Robot"
-                    width={500}
-                    height={500}
-                    className="rounded-full object-cover"
-                    data-ai-hint="robot"
-                />
             </div>
           </div>
           <div 
