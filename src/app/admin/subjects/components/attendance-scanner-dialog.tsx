@@ -84,7 +84,7 @@ export function AttendanceScannerDialog({
   >(null);
   const [scannedData, setScannedData] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [scannedStudentInfo, setScannedStudentInfo] = useState<ScannedStudentInfo | null>(null);
+  const [confirmationMessage, setConfirmationMessage] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [presentStudents, setPresentStudents] = useState<
     (Student & { id: string })[]
@@ -310,12 +310,6 @@ export function AttendanceScannerDialog({
         const studentDoc = await getDoc(doc(firestore, 'users', qrData.studentId));
         const studentData = studentDoc.data() as Student | undefined;
         
-        // This is a collection group query which can be expensive.
-        // Let's assume for now that admins have broader permissions.
-        // A more scalable solution might involve a different data structure
-        // or cloud function for validation if rules become too complex.
-        
-        // Use setDoc with studentId as the document ID for idempotent writes
         const attendanceDocRef = doc(firestore, `subjects/${subject.id}/attendanceSessions/${activeSession.id}/attendance`, qrData.studentId);
         await setDoc(attendanceDocRef, {
           studentId: qrData.studentId,
@@ -327,16 +321,9 @@ export function AttendanceScannerDialog({
         });
 
         if (studentData) {
-            setScannedStudentInfo({
-                name: `${studentData.firstName} ${studentData.lastName}`,
-                avatarUrl: studentData.avatarUrl
-            });
-             toast({
-                title: 'Attendance Marked!',
-                description: `${studentData.firstName} ${studentData.lastName} marked as present.`,
-            });
+            const studentName = `${studentData.firstName} ${studentData.lastName}`;
+            setConfirmationMessage(`${studentName}'s attendance is recorded`);
         }
-        // No toast needed here anymore, as the overlay provides feedback
       } else {
         toast({
           variant: 'destructive',
@@ -345,7 +332,6 @@ export function AttendanceScannerDialog({
         });
       }
     } catch (error: any) {
-        // This will catch the re-thrown permission error or other parsing/validation errors
         if (error.name !== 'FirebaseError') {
           console.error('Error processing QR code:', error);
           toast({
@@ -358,8 +344,8 @@ export function AttendanceScannerDialog({
       setTimeout(() => {
         setIsProcessing(false);
         setScannedData(null);
-        setScannedStudentInfo(null);
-      }, 2000); // 2-second cooldown
+        setConfirmationMessage(null); // Clear confirmation message
+      }, 3000); // 3-second cooldown
     }
   }, [
     scannedData,
@@ -428,6 +414,15 @@ export function AttendanceScannerDialog({
                 Please show your Subject QR Code Generated at least 1 foot to the device camera. Thank you
               </AlertDescription>
             </Alert>
+            {confirmationMessage && (
+                <Alert variant="default" className="mt-2 bg-green-500/10 border-green-500/20 text-green-700">
+                    <CheckCircle className="h-4 w-4" />
+                    <AlertTitle>Success!</AlertTitle>
+                    <AlertDescription>
+                        {confirmationMessage}
+                    </AlertDescription>
+                </Alert>
+            )}
         </DialogHeader>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start h-full overflow-hidden">
           {/* Left Column: Scanner and Controls */}
@@ -462,21 +457,7 @@ export function AttendanceScannerDialog({
                   </div>
                 </div>
               )}
-               {scannedStudentInfo && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 text-white p-4 text-center">
-                    <CheckCircle className="h-16 w-16 text-green-400 mb-4" />
-                    <Avatar className="h-24 w-24 mb-4 ring-4 ring-green-400">
-                        <AvatarImage src={scannedStudentInfo.avatarUrl} />
-                        <AvatarFallback>
-                            {scannedStudentInfo.name.split(' ').map(n => n[0]).join('')}
-                        </AvatarFallback>
-                    </Avatar>
-                    <p className="text-xl">Attendance of</p>
-                    <h3 className="text-3xl font-bold my-2">{scannedStudentInfo.name}</h3>
-                    <p className="text-xl">is Recorded</p>
-                </div>
-              )}
-              {isProcessing && !scannedStudentInfo && (
+              {isProcessing && !confirmationMessage && (
                 <div className="absolute inset-0 flex items-center justify-center bg-black/60">
                   <p className="text-white text-lg animate-pulse">
                     Processing...
@@ -566,5 +547,3 @@ export function AttendanceScannerDialog({
     </Dialog>
   );
 }
-
-    
