@@ -306,8 +306,8 @@ export default function StudentDashboardPage() {
           <Info className="h-4 w-4" />
           <AlertTitle>Device Registration Required</AlertTitle>
           <AlertDescription>
-            To generate QR codes for attendance, you must register your primary
-            device. This is a one-time action and can be done from any subject card below.
+            To generate QR codes for attendance, you must register your primary device. This is a one-time action.
+            <Button onClick={handleRegisterDevice} size="sm" className="mt-2 w-full sm:w-auto">Register This Device</Button>
           </AlertDescription>
         </Alert>
       )}
@@ -373,4 +373,3 @@ export default function StudentDashboardPage() {
     </>
   );
 }
-
