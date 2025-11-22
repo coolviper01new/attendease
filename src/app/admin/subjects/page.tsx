@@ -70,11 +70,12 @@ export default function AdminSubjectsPage() {
             <DialogHeader>
               <DialogTitle>{editingSubject ? 'Edit Subject' : 'Create New Subject(s)'}</DialogTitle>
               <DialogDescription>
-                {editingSubject ? 'Update the details for this subject block.' : 'Fill out the form below to add a new subject to the system.'}
+                {editingSubject ? 'Update the details for this subject and all its blocks.' : 'Fill out the form below to add a new subject to the system.'}
               </DialogDescription>
             </DialogHeader>
             <AddSubjectForm 
-                subject={editingSubject} 
+                subject={editingSubject}
+                allSubjects={combinedSubjects} 
                 onSuccess={handleSuccess}
              />
           </DialogContent>

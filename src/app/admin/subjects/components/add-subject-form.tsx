@@ -24,11 +24,11 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { useFirestore } from '@/firebase';
-import { addDoc, collection, doc, setDoc, writeBatch } from 'firebase/firestore';
+import { addDoc, collection, doc, setDoc, writeBatch, query, where, getDocs, deleteDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Copy } from 'lucide-react';
-import type { Subject } from '@/lib/types';
+import type { Subject, Registration } from '@/lib/types';
 
 const schoolYearRegex = /^\d{4}-\d{4}$/;
 
@@ -56,23 +56,23 @@ const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 interface AddSubjectFormProps {
   onSuccess: () => void;
   subject?: Subject | null;
+  allSubjects: Subject[];
 }
 
-export function AddSubjectForm({ onSuccess, subject }: AddSubjectFormProps) {
+export function AddSubjectForm({ onSuccess, subject, allSubjects }: AddSubjectFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const firestore = useFirestore();
   const { toast } = useToast();
 
   const isEditMode = !!subject;
 
+  // In edit mode, find all related blocks to determine the count
+  const existingBlocksForCode = isEditMode ? allSubjects.filter(s => s.code === subject.code) : [];
+  const initialBlockCount = isEditMode ? existingBlocksForCode.length : 1;
+
   const form = useForm<SubjectFormValues>({
     resolver: zodResolver(subjectSchema),
-    defaultValues: isEditMode ? {
-        ...subject,
-        schoolYear: subject.schoolYear,
-        yearLevel: subject.yearLevel,
-        blockCount: 1, // In edit mode, we only edit one block at a time.
-    } : {
+    defaultValues: {
       schedules: [],
       schoolYear: '',
       yearLevel: '',
@@ -85,6 +85,7 @@ export function AddSubjectForm({ onSuccess, subject }: AddSubjectFormProps) {
   
   useEffect(() => {
     if (isEditMode && subject) {
+      const relatedBlocks = allSubjects.filter(s => s.code === subject.code);
       form.reset({
         name: subject.name,
         code: subject.code,
@@ -92,7 +93,7 @@ export function AddSubjectForm({ onSuccess, subject }: AddSubjectFormProps) {
         schoolYear: subject.schoolYear,
         yearLevel: subject.yearLevel,
         schedules: subject.schedules,
-        blockCount: 1,
+        blockCount: relatedBlocks.length,
       });
     } else {
         form.reset({
@@ -105,7 +106,7 @@ export function AddSubjectForm({ onSuccess, subject }: AddSubjectFormProps) {
             blockCount: 1,
         })
     }
-  }, [subject, form, isEditMode]);
+  }, [subject, form, isEditMode, allSubjects]);
 
 
   const { fields, append, remove, update } = useFieldArray({
@@ -161,44 +162,84 @@ export function AddSubjectForm({ onSuccess, subject }: AddSubjectFormProps) {
   const onSubmit = async (values: SubjectFormValues) => {
     setIsSubmitting(true);
     try {
-      if (isEditMode && subject?.id) {
-        const subjectRef = doc(firestore, 'subjects', subject.id);
-        const { blockCount, ...updateData } = values;
-        // In edit mode, we assume the block name is derived from the subject code if it follows the pattern.
-        const blockName = subject.block.startsWith(subject.code) ? subject.block : `${values.code}-B1`;
-        await setDoc(subjectRef, { ...updateData, block: blockName }, { merge: true });
-        toast({
-          title: 'Subject Updated',
-          description: `${values.name} (${blockName}) has been updated successfully.`,
-        });
-      } else {
-        const batch = writeBatch(firestore);
         const { blockCount, ...subjectData } = values;
+        const subjectsRef = collection(firestore, 'subjects');
+        const batch = writeBatch(firestore);
 
-        for (let i = 1; i <= blockCount; i++) {
-          const newDocRef = doc(collection(firestore, 'subjects'));
-          const blockName = `${values.code}-B${i}`;
-          batch.set(newDocRef, { ...subjectData, block: blockName });
+        if (isEditMode && subject) {
+            // Edit mode: Sync blocks - add, update, or remove
+            const relatedSubjectsQuery = query(subjectsRef, where('code', '==', subject.code));
+            const snapshot = await getDocs(relatedSubjectsQuery);
+            const existingSubjects = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Subject));
+            const existingBlockCount = existingSubjects.length;
+
+            // Update all existing blocks with new shared data
+            existingSubjects.forEach(existingSub => {
+                batch.update(doc(subjectsRef, existingSub.id), subjectData);
+            });
+
+            if (blockCount > existingBlockCount) {
+                // Add new blocks
+                for (let i = existingBlockCount + 1; i <= blockCount; i++) {
+                    const newDocRef = doc(subjectsRef);
+                    const blockName = `${values.code}-B${i}`;
+                    batch.set(newDocRef, { ...subjectData, block: blockName });
+                }
+            } else if (blockCount < existingBlockCount) {
+                // Remove blocks, starting from the highest number
+                const blocksToRemove = existingSubjects.sort((a, b) => b.block.localeCompare(a.block)).slice(0, existingBlockCount - blockCount);
+                
+                let undeletableBlocks: string[] = [];
+
+                for (const blockToRemove of blocksToRemove) {
+                    const registrationsQuery = query(collectionGroup(firestore, 'registrations'), where('subjectId', '==', blockToRemove.id));
+                    const registrationsSnapshot = await getDocs(registrationsQuery);
+
+                    if (registrationsSnapshot.empty) {
+                        batch.delete(doc(subjectsRef, blockToRemove.id));
+                    } else {
+                        undeletableBlocks.push(blockToRemove.block);
+                    }
+                }
+                
+                if (undeletableBlocks.length > 0) {
+                    toast({
+                        variant: 'destructive',
+                        title: 'Deletion Prevented',
+                        description: `Could not delete block(s) ${undeletableBlocks.join(', ')} because students are enrolled.`,
+                    });
+                }
+            }
+            await batch.commit();
+            toast({
+                title: 'Subjects Synchronized',
+                description: `All blocks for ${values.name} have been updated.`,
+            });
+        } else {
+            // Create mode: Create all blocks from scratch
+            for (let i = 1; i <= blockCount; i++) {
+                const newDocRef = doc(subjectsRef);
+                const blockName = `${values.code}-B${i}`;
+                batch.set(newDocRef, { ...subjectData, block: blockName });
+            }
+            await batch.commit();
+            toast({
+                title: 'Subjects Created',
+                description: `${blockCount} block(s) for ${values.name} have been created successfully.`,
+            });
         }
-
-        await batch.commit();
-        toast({
-          title: 'Subjects Created',
-          description: `${blockCount} block(s) for ${values.name} have been created successfully.`,
-        });
-      }
-      onSuccess();
+        onSuccess();
     } catch (error) {
-      console.error('Error saving subject(s):', error);
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: `Failed to ${isEditMode ? 'update' : 'create'} subject(s). Please try again.`,
-      });
+        console.error('Error saving subject(s):', error);
+        toast({
+            variant: 'destructive',
+            title: 'Error',
+            description: `Failed to save subjects. Please try again.`,
+        });
     } finally {
-      setIsSubmitting(false);
+        setIsSubmitting(false);
     }
-  };
+};
   
   return (
     <Form {...form}>
@@ -223,8 +264,9 @@ export function AddSubjectForm({ onSuccess, subject }: AddSubjectFormProps) {
             <FormItem>
               <FormLabel>Subject Code</FormLabel>
               <FormControl>
-                <Input placeholder="e.g., CS101" {...field} />
+                <Input placeholder="e.g., CS101" {...field} disabled={isEditMode} />
               </FormControl>
+              {isEditMode && <FormDescription>Subject code cannot be changed after creation.</FormDescription>}
               <FormMessage />
             </FormItem>
           )}
@@ -287,12 +329,12 @@ export function AddSubjectForm({ onSuccess, subject }: AddSubjectFormProps) {
                 <FormItem>
                 <FormLabel>Number of Blocks</FormLabel>
                  <FormControl>
-                  <Input type="number" min="1" {...field} disabled={isEditMode} />
+                  <Input type="number" min="1" {...field} />
                 </FormControl>
                 <FormDescription>
                     {isEditMode 
-                        ? "Editing affects only this specific block. To change the number of blocks, create a new subject."
-                        : "Enter the number of blocks for this subject. The system will create separate entries like IT101-B1, IT101-B2, etc."
+                        ? "Adjust the number of blocks. New blocks will be added, and empty blocks will be removed."
+                        : "Enter the number of blocks. The system will create separate entries like IT101-B1, IT101-B2, etc."
                     }
                 </FormDescription>
                 <FormMessage />
@@ -304,7 +346,7 @@ export function AddSubjectForm({ onSuccess, subject }: AddSubjectFormProps) {
           <FormLabel>Schedule</FormLabel>
           <FormDescription className="mb-2">Select the days this subject is scheduled and fill in the details.</FormDescription>
           <div className="space-y-4">
-            {daysOfWeek.map((day) => {
+            {daysOfWeek.map((day, index) => {
               const fieldIndex = fields.findIndex(f => f.day === day);
               const isChecked = fieldIndex > -1;
               return (
@@ -391,7 +433,7 @@ export function AddSubjectForm({ onSuccess, subject }: AddSubjectFormProps) {
         </div>
 
         <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? (isEditMode ? 'Updating...' : 'Creating...') : (isEditMode ? 'Update Subject' : 'Create Subjects')}
+          {isSubmitting ? (isEditMode ? 'Updating...' : 'Creating...') : (isEditMode ? 'Update Subjects' : 'Create Subjects')}
         </Button>
       </form>
     </Form>
