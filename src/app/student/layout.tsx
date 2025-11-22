@@ -23,7 +23,7 @@ function StudentHeader() {
                 <div className="bg-primary rounded-md p-2">
                     <AppWindow className="h-6 w-6 text-primary-foreground" />
                 </div>
-                <span className="font-bold font-headline text-lg">MATERIO</span>
+                <span className="font-bold font-headline text-lg">AttendEase</span>
             </Link>
         </div>
         

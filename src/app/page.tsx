@@ -29,7 +29,7 @@ export default function LandingPage() {
         <div className="container flex h-16 items-center justify-between">
           <Link href="/" className="flex items-center gap-2 font-bold font-headline">
             <AppWindow className="h-6 w-6 text-primary" />
-            <span>Materio</span>
+            <span>AttendEase</span>
           </Link>
           <div className="flex items-center gap-2">
             <Button variant="ghost" asChild>
@@ -50,7 +50,7 @@ export default function LandingPage() {
                 A smarter way to manage attendance.
               </h1>
               <p className="max-w-[700px] text-lg text-foreground/80">
-                Welcome to Materio, the intelligent attendance management system designed to streamline your classroom.
+                Welcome to AttendEase, the intelligent attendance management system designed to streamline your classroom.
               </p>
               <div className="flex gap-4 mt-4">
                 <Button size="lg" asChild>

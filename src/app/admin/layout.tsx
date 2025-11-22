@@ -15,7 +15,7 @@ export default function AdminLayout({
       <div className="container flex items-center justify-between p-4 md:hidden">
         <Link href="/" className="flex items-center gap-2 font-bold font-headline">
             <AppWindow className="h-6 w-6 text-primary" />
-            <span>MATERIO</span>
+            <span>AttendEase</span>
         </Link>
         <SidebarTrigger />
       </div>
@@ -26,7 +26,7 @@ export default function AdminLayout({
                     <div className="bg-primary rounded-md p-2">
                       <AppWindow className="h-6 w-6 text-primary-foreground" />
                     </div>
-                    <span className="group-data-[collapsible=icon]:hidden">MATERIO</span>
+                    <span className="group-data-[collapsible=icon]:hidden">AttendEase</span>
                 </Link>
             </SidebarHeader>
             <SidebarContent>
