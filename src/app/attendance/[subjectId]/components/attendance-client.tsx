@@ -1,3 +1,4 @@
+
 'use client';
 import { useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -10,7 +11,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
+import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
 import { doc, collection, query, where, getDocs, addDoc, updateDoc, serverTimestamp, writeBatch } from "firebase/firestore";
 import type { Subject, User, Student, Registration, AttendanceSession, Attendance } from "@/lib/types";
 import { useEffect, useState, useRef } from "react";
@@ -25,6 +26,7 @@ interface AttendanceClientProps {
 
 export function AttendanceClient({ subject }: AttendanceClientProps) {
   const firestore = useFirestore();
+  const { user: adminUser } = useUser();
   const { toast } = useToast();
   const videoRef = useRef<HTMLVideoElement>(null);
 
@@ -98,6 +100,11 @@ export function AttendanceClient({ subject }: AttendanceClientProps) {
   useEffect(() => {
     let isMounted = true;
     const getCameraPermission = async () => {
+      if (!navigator.mediaDevices?.getUserMedia) {
+        if(isMounted) setHasCameraPermission(false);
+        console.error("Camera API not supported in this browser.");
+        return;
+      }
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
         if (isMounted && videoRef.current) {
@@ -149,7 +156,7 @@ export function AttendanceClient({ subject }: AttendanceClientProps) {
   useEffect(() => {
     let isMounted = true;
     const processScan = async () => {
-      if (!scannedData || isProcessing || !activeSession) return;
+      if (!scannedData || isProcessing || !activeSession || !adminUser) return;
 
       setIsProcessing(true);
       
@@ -165,10 +172,14 @@ export function AttendanceClient({ subject }: AttendanceClientProps) {
           return;
         }
 
-        const studentDocRef = doc(firestore, 'users', qrData.studentId);
-        const studentDoc = await getDocs(query(collectionGroup(firestore, 'registrations'), where('studentId', '==', qrData.studentId), where('subjectId', '==', subject.id)));
-        const isRegistered = !studentDoc.empty;
-        const studentData = (await getDocs(query(collection(firestore, 'users'), where('__name__', '==', qrData.studentId)))).docs[0].data();
+        const studentRegQuery = query(collectionGroup(firestore, 'registrations'), where('studentId', '==', qrData.studentId), where('subjectId', '==', subject.id));
+        const studentRegSnapshot = await getDocs(studentRegQuery);
+        const isRegistered = !studentRegSnapshot.empty;
+
+        const studentQuery = query(collection(firestore, 'users'), where('__name__', '==', qrData.studentId));
+        const studentSnapshot = await getDocs(studentQuery);
+        const studentData = studentSnapshot.docs[0]?.data();
+
 
         const validationInput = {
           qrCodeData: scannedData,
@@ -189,12 +200,12 @@ export function AttendanceClient({ subject }: AttendanceClientProps) {
               subjectId: subject.id,
               timestamp: serverTimestamp(),
               status: 'present',
-              recordedBy: 'admin', // This needs to be the admin's ID
+              recordedBy: adminUser.uid,
               date: new Date().toISOString().split('T')[0],
             });
             toast({
                 title: "Attendance Marked!",
-                description: `${studentData?.firstName} ${studentData?.lastName} marked as present.`,
+                description: `${studentData?.firstName || 'Student'} ${studentData?.lastName || ''} marked as present.`,
             });
           }
         } else {
@@ -217,7 +228,7 @@ export function AttendanceClient({ subject }: AttendanceClientProps) {
     processScan();
     
     return () => { isMounted = false; }
-  }, [scannedData, isProcessing, activeSession, subject, firestore, toast, attendanceRecords, sessionAttendanceQuery]);
+  }, [scannedData, isProcessing, activeSession, subject, firestore, toast, attendanceRecords, sessionAttendanceQuery, adminUser]);
   
   // Clock effect
   useEffect(() => {
