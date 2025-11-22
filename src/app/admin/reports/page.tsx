@@ -19,7 +19,9 @@ export default function AdminReportsPage() {
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
+        let isMounted = true;
         const fetchData = async () => {
+            if (!isMounted) return;
             setIsLoading(true);
             try {
                 // Fetch all data
@@ -27,6 +29,8 @@ export default function AdminReportsPage() {
                 const subjectsSnapshot = await getDocs(collection(firestore, 'subjects'));
                 const attendanceSnapshot = await getDocs(query(collectionGroup(firestore, 'attendance')));
                 const warningsSnapshot = await getDocs(query(collectionGroup(firestore, 'warnings')));
+
+                if (!isMounted) return;
 
                 const students = studentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as (User & {id: string, name: string})[];
                 const subjects = subjectsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as (Subject & {id: string})[];
@@ -60,11 +64,17 @@ export default function AdminReportsPage() {
             } catch (error) {
                 console.error("Error fetching report data:", error);
             } finally {
-                setIsLoading(false);
+                if (isMounted) {
+                    setIsLoading(false);
+                }
             }
         };
 
         fetchData();
+
+        return () => {
+            isMounted = false;
+        };
     }, [firestore]);
 
   return (
@@ -102,5 +112,3 @@ export default function AdminReportsPage() {
     </>
   );
 }
-
-    
