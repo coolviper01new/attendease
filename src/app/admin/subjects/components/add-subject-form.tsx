@@ -84,26 +84,31 @@ export function AddSubjectForm({ onSuccess }: AddSubjectFormProps) {
     }
   };
 
-  const handleCopySchedule = (sourceIndex: number) => {
-    const sourceSchedule = form.getValues(`schedules.${sourceIndex}`);
+  const handleCopySchedule = (targetIndex: number) => {
+    if (targetIndex === 0) {
+      toast({
+        variant: 'destructive',
+        title: 'Cannot Copy',
+        description: 'There is no previous day to copy from.',
+      });
+      return;
+    }
+  
+    const sourceSchedule = form.getValues(`schedules.${targetIndex - 1}`);
     if (!sourceSchedule) return;
-
+  
     const { startTime, endTime, room } = sourceSchedule;
-
-    fields.forEach((field, index) => {
-      if (index !== sourceIndex) { // Don't update the source
-        update(index, {
-          ...field, // Keep the day
-          startTime,
-          endTime,
-          room,
-        });
-      }
+  
+    update(targetIndex, {
+      ...fields[targetIndex],
+      startTime,
+      endTime,
+      room,
     });
-
+  
     toast({
-        title: "Schedule Copied",
-        description: "The time and room have been copied to all other selected days.",
+      title: 'Schedule Copied',
+      description: `Schedule from ${sourceSchedule.day} has been copied.`,
     });
   };
 
@@ -296,7 +301,7 @@ export function AddSubjectForm({ onSuccess }: AddSubjectFormProps) {
                         variant="ghost" 
                         size="icon"
                         onClick={() => handleCopySchedule(fieldIndex)}
-                        aria-label="Copy schedule to all other checked days"
+                        aria-label="Copy schedule from previous day"
                       >
                         <Copy className="h-4 w-4" />
                       </Button>
