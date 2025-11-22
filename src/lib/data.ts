@@ -8,7 +8,7 @@ export const mockAdmin: Admin = {
 };
 
 export const mockStudents: Student[] = [
-  { id: 'student01', name: 'Alice Johnson', email: 'alice.j@example.com', studentNumber: 'S001', blockId: 'block01', avatarUrl: 'https://picsum.photos/seed/avatar1/100/100' },
+  { id: 'student01', name: 'Alice Johnson', email: 'alice.j@example.com', studentNumber: 'S001', blockId: 'block01', avatarUrl: 'https://picsum.photos/seed/avatar1/100/100', deviceId: 'device-alice-123' },
   { id: 'student02', name: 'Bob Williams', email: 'bob.w@example.com', studentNumber: 'S002', blockId: 'block01', avatarUrl: 'https://picsum.photos/seed/avatar2/100/100' },
   { id: 'student03', name: 'Charlie Brown', email: 'charlie.b@example.com', studentNumber: 'S003', blockId: 'block01', avatarUrl: 'https://picsum.photos/seed/avatar3/100/100' },
   { id: 'student04', name: 'Diana Miller', email: 'diana.m@example.com', studentNumber: 'S004', blockId: 'block02', avatarUrl: 'https://picsum.photos/seed/avatar4/100/100' },
@@ -72,13 +72,11 @@ export const mockAttendanceSessions: AttendanceSession[] = [
 ];
 
 export const getStudentSubjects = (studentId: string) => {
-    if (studentId === 'student01' || studentId === 'student02' || studentId === 'student03') {
-        return mockSubjects.filter(s => s.blockId === 'block01');
-    }
-    if (studentId === 'student04') {
-        return mockSubjects.filter(s => s.blockId === 'block02');
-    }
-    return [];
+    const student = mockStudents.find(s => s.id === studentId);
+    if (!student) return [];
+    
+    const studentBlockId = student.blockId;
+    return mockSubjects.filter(s => s.blockId === studentBlockId);
 }
 
 export const getStudentAttendance = (studentId: string) => {

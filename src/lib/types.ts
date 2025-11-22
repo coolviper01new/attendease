@@ -77,6 +77,7 @@ export type Student = {
   studentNumber: string;
   blockId: string;
   avatarUrl: string;
+  deviceId?: string;
 };
 
 export type Admin = {
