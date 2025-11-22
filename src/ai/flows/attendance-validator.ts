@@ -1,3 +1,4 @@
+
 // src/ai/flows/attendance-validator.ts
 'use server';
 
@@ -13,10 +14,10 @@ import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
 const ValidateAttendanceInputSchema = z.object({
-  qrCodeData: z.string().describe('The data extracted from the QR code.'),
+  qrCodeData: z.string().describe('The JSON string data extracted from the QR code.'),
   subjectId: z.string().describe('The ID of the subject for which attendance is being recorded.'),
   studentId: z.string().describe('The ID of the student whose attendance is being recorded.'),
-  qrCodeSecret: z.string().describe('The secret key used to generate the QR code.'),
+  qrCodeSecret: z.string().describe('The secret key for the currently active attendance session.'),
   attendanceSessionActive: z.boolean().describe('Indicates if the attendance session is currently active.'),
   studentRegistered: z.boolean().describe('Indicates if the student is registered for the subject.'),
 });
@@ -38,23 +39,23 @@ const validateAttendancePrompt = ai.definePrompt({
   output: {schema: ValidateAttendanceOutputSchema},
   prompt: `You are an AI assistant that validates attendance entries based on QR code data.
 
-  Your task is to determine if the attendance entry is valid based on the following information:
-  - QR Code Data: {{{qrCodeData}}}
-  - Subject ID: {{{subjectId}}}
-  - Student ID: {{{studentId}}}
-  - QR Code Secret: {{{qrCodeSecret}}}
-  - Attendance Session Active: {{{attendanceSessionActive}}}
-  - Student Registered: {{{studentRegistered}}}
+  Your task is to determine if an attendance entry is valid. A valid entry must satisfy ALL of the following conditions:
+  1. The attendance session for the subject must be active.
+  2. The student must be registered for the subject.
+  3. The 'qrCodeSecret' from the QR code must exactly match the 'qrCodeSecret' of the active session.
 
-  Consider these factors to prevent errors:
-  - Verify that the QR code data contains the subjectId, studentId and qrCodeSecret.
-  - Check if the attendance session is active. If not, the attendance entry is invalid.
-  - Confirm that the student is registered for the subject. If not, the attendance entry is invalid.
-  - Ensure that the QR code secret matches the stored secret in the database. If not, the attendance entry is invalid.
+  Here is the information for the current attempt:
+  - Attendance Session is Active: {{{attendanceSessionActive}}}
+  - Student is Registered: {{{studentRegistered}}}
+  - Active Session's Secret Key: {{{qrCodeSecret}}}
+  - QR Code Data (JSON String): {{{qrCodeData}}}
 
-  Based on your analysis, determine if the attendance entry is valid and provide a reason for your determination.
-  Set the isValid field to true if the attendance entry is valid; otherwise, set it to false and explain the reasoning behind it.
-  Make sure that the output is a valid JSON object.
+  First, parse the 'qrCodeData' JSON string. It should contain a 'qrCodeSecret'.
+  Then, compare the parsed secret from the QR code with the 'Active Session's Secret Key'.
+
+  Based on all conditions, determine if the attendance is valid.
+  - If valid, set 'isValid' to true and 'reason' to "Attendance validated."
+  - If invalid, set 'isValid' to false and provide a clear, single reason for the failure (e.g., "QR code is for a different session.", "Student is not registered for this subject.", "Attendance session is not active.").
   `,
 });
 
@@ -65,6 +66,7 @@ const validateAttendanceFlow = ai.defineFlow(
     outputSchema: ValidateAttendanceOutputSchema,
   },
   async input => {
+    // The prompt is now structured to handle the validation logic.
     const {output} = await validateAttendancePrompt(input);
     return output!;
   }
