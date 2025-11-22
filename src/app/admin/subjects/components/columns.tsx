@@ -3,9 +3,9 @@
 "use client";
 
 import { ColumnDef } from "@tanstack/react-table";
-import type { Subject, AttendanceSession as TAttendanceSession } from "@/lib/types";
+import type { Subject, AttendanceSession as TAttendanceSession, Registration } from "@/lib/types";
 import { Button } from "@/components/ui/button";
-import { ArrowUpDown, MoreHorizontal, QrCode, PlayCircle, Clock } from "lucide-react";
+import { ArrowUpDown, MoreHorizontal, QrCode, PlayCircle, Clock, Trash2 } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -31,7 +31,7 @@ import { Label } from "@/components/ui/label";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
-import { collection, query, where, doc, updateDoc, writeBatch } from "firebase/firestore";
+import { collection, query, where, doc, updateDoc, writeBatch, collectionGroup, getDocs } from "firebase/firestore";
 import {
   Dialog,
   DialogContent,
@@ -109,7 +109,7 @@ const EnrollmentQrCodeDialog = ({ subject, allSubjects }: { subject: Subject; al
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Enrollment QR Code</DialogTitle>
+          <DialogTitle>Enrollment QR Code for {subject.name}</DialogTitle>
           <DialogDescription>
             Generate a QR code for a specific block of {subject.name}.
           </DialogDescription>
@@ -213,6 +213,85 @@ const StartEnrollmentAction = ({ subject, allSubjects, onStarted }: { subject: S
     );
 };
 
+const DeleteSubjectAction = ({ subject, allSubjects, onDeleted }: { subject: Subject; allSubjects: Subject[], onDeleted: () => void }) => {
+    const firestore = useFirestore();
+    const { toast } = useToast();
+    const [isSubmitting, setIsSubmitting] = useState(false);
+
+    // Group all subjects by code to find related blocks
+    const groupedSubjects = useMemo(() => groupBy(allSubjects, 'code'), [allSubjects]);
+    const relatedBlocks = groupedSubjects[subject.code] || [];
+    const relatedBlockIds = relatedBlocks.map(b => b.id);
+    const isEnrollmentOpen = relatedBlocks.some(b => b.enrollmentStatus === 'open');
+
+    const handleDelete = async () => {
+        setIsSubmitting(true);
+        try {
+            // 1. Check for existing enrollments in any of the related blocks
+            const registrationsQuery = query(collectionGroup(firestore, 'registrations'), where('subjectId', 'in', relatedBlockIds));
+            const registrationsSnapshot = await getDocs(registrationsQuery);
+
+            if (!registrationsSnapshot.empty) {
+                toast({
+                    variant: 'destructive',
+                    title: 'Deletion Failed',
+                    description: `Cannot delete ${subject.name}. At least one student is enrolled in one of its blocks.`,
+                });
+                setIsSubmitting(false);
+                return;
+            }
+            
+            // 2. If no enrollments, proceed with deletion
+            const batch = writeBatch(firestore);
+            relatedBlockIds.forEach(id => {
+                const subjectRef = doc(firestore, 'subjects', id);
+                batch.delete(subjectRef);
+            });
+            await batch.commit();
+
+            toast({
+                title: 'Subject Deleted',
+                description: `${subject.name} and all its associated blocks have been deleted.`,
+            });
+            onDeleted();
+        } catch (error) {
+            console.error("Error deleting subject:", error);
+            toast({
+                variant: 'destructive',
+                title: 'Error',
+                description: 'Could not delete subject. Please try again.',
+            });
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+    
+    return (
+        <AlertDialog>
+            <AlertDialogTrigger asChild>
+                <div className="relative flex cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-destructive outline-none transition-colors focus:bg-destructive focus:text-destructive-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50">
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    <span>Delete Subject</span>
+                </div>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        This will permanently delete the subject <span className="font-bold">{subject.name}</span> and all of its blocks ({relatedBlocks.map(b => b.block).join(', ')}). This action cannot be undone and will only succeed if no students are enrolled in any of these blocks.
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction className="bg-destructive hover:bg-destructive/90 text-destructive-foreground" onClick={handleDelete} disabled={isSubmitting}>
+                        {isSubmitting ? 'Deleting...' : 'Confirm & Delete'}
+                    </AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
+    );
+};
+
 
 type GetColumnsProps = {
   onEdit: (subject: Subject) => void;
@@ -229,8 +308,8 @@ const ActionsCell = ({ row, onEdit, allSubjects, onRefresh }: { row: any, onEdit
     // Find the subject that represents the first block to ensure consistent actions
     const representativeSubject = relatedBlocks.sort((a,b) => a.block.localeCompare(b.block))[0] || subject;
 
-    if (subject.id !== representativeSubject.id) {
-        return null; // Only show actions on the first representative row of the group
+    if (row.getIsGrouped() || (row.depth > 0 && subject.id !== representativeSubject.id)) {
+        return null; // Only show actions on the first representative row of the group, or on non-grouped rows
     }
 
     return (
@@ -253,7 +332,7 @@ const ActionsCell = ({ row, onEdit, allSubjects, onRefresh }: { row: any, onEdit
             <DropdownMenuItem asChild>
               <Link href={`/admin/subjects/${subject.id}`}>View Attendance</Link>
             </DropdownMenuItem>
-             <DropdownMenuItem className="text-destructive focus:text-destructive-foreground focus:bg-destructive">Delete Subject</DropdownMenuItem>
+             <DeleteSubjectAction subject={representativeSubject} allSubjects={allSubjects} onDeleted={onRefresh} />
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
@@ -276,8 +355,14 @@ export const getColumns = ({ onEdit, allSubjects, onRefresh }: GetColumnsProps):
     },
     cell: ({ row }) => (
       <div className="pl-4">
-        <div className="font-medium">{row.original.name}</div>
-        <div className="text-xs text-muted-foreground">{row.original.code}</div>
+        {row.getIsGrouped() ? (
+          <div className="font-bold">{row.original.name}</div>
+        ) : (
+          <>
+            <div className="font-medium">{row.original.name}</div>
+            <div className="text-xs text-muted-foreground">{row.original.code}</div>
+          </>
+        )}
       </div>
     ),
     sortingFn: 'text',
@@ -293,6 +378,8 @@ export const getColumns = ({ onEdit, allSubjects, onRefresh }: GetColumnsProps):
       header: "Schedule",
       cell: ({row}) => {
         const { lectureSchedules, labSchedules, hasLab } = row.original;
+        if (!lectureSchedules || lectureSchedules.length === 0) return <span className="text-xs text-muted-foreground">Not set</span>;
+        
         return (
             <div className="text-xs flex flex-col gap-2">
                 {lectureSchedules && lectureSchedules.length > 0 && (
@@ -351,3 +438,4 @@ export const getColumns = ({ onEdit, allSubjects, onRefresh }: GetColumnsProps):
   },
 ];
 
+    
