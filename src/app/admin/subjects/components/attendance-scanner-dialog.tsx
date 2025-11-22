@@ -38,6 +38,7 @@ import {
   updateDoc,
   serverTimestamp,
   getDoc,
+  collectionGroup,
 } from 'firebase/firestore';
 import { validateAttendance } from '@/ai/flows/attendance-validator';
 import type {
