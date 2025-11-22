@@ -31,8 +31,9 @@ export function AdminSidebarNav() {
             <SidebarMenuItem key={link.href}>
                 <SidebarMenuButton
                 asChild
-                isActive={pathname === link.href}
+                isActive={pathname.startsWith(link.href)}
                 tooltip={link.label}
+                className="data-[active=true]:bg-primary/10 data-[active=true]:text-primary data-[active=true]:font-semibold"
                 >
                 <a href={link.href}>
                     <link.icon />

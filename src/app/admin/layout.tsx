@@ -1,5 +1,5 @@
 import { Header } from "@/components/header";
-import { SidebarProvider, Sidebar, SidebarInset, SidebarTrigger, SidebarContent, SidebarHeader, SidebarFooter } from "@/components/ui/sidebar";
+import { SidebarProvider, Sidebar, SidebarTrigger, SidebarContent, SidebarHeader, SidebarFooter } from "@/components/ui/sidebar";
 import { AdminSidebarNav } from "./components/admin-sidebar-nav";
 import Link from "next/link";
 import { AppWindow, Settings, LifeBuoy } from "lucide-react";
@@ -15,16 +15,18 @@ export default function AdminLayout({
       <div className="container flex items-center justify-between p-4 md:hidden">
         <Link href="/" className="flex items-center gap-2 font-bold font-headline">
             <AppWindow className="h-6 w-6 text-primary" />
-            <span>Crema</span>
+            <span>MATERIO</span>
         </Link>
         <SidebarTrigger />
       </div>
       <div className="flex">
         <Sidebar collapsible="icon" className="hidden md:flex w-64 flex-col">
             <SidebarHeader className="p-4">
-                 <Link href="/" className="flex items-center gap-2 font-bold text-lg text-sidebar-foreground font-headline">
-                    <AppWindow className="h-8 w-8 text-primary" />
-                    <span className="group-data-[collapsible=icon]:hidden">CREMA</span>
+                 <Link href="/" className="flex items-center gap-2 font-bold text-xl text-sidebar-foreground font-headline">
+                    <div className="bg-primary rounded-md p-2">
+                      <AppWindow className="h-6 w-6 text-primary-foreground" />
+                    </div>
+                    <span className="group-data-[collapsible=icon]:hidden">MATERIO</span>
                 </Link>
             </SidebarHeader>
             <SidebarContent>
@@ -41,7 +43,7 @@ export default function AdminLayout({
                 </Button>
             </SidebarFooter>
         </Sidebar>
-        <div className="flex-1">
+        <div className="flex-1 bg-background">
             <Header />
             <main className="p-6">
                 {children}
