@@ -286,6 +286,8 @@ export function AttendanceScannerDialog({
           title: 'Already Marked',
           description: 'This student has already been marked present.',
         });
+        setIsProcessing(false);
+        setScannedData(null);
         return;
       }
       
@@ -389,7 +391,6 @@ export function AttendanceScannerDialog({
       description: 'You can now start scanning student QR codes.',
     });
     refreshSessions();
-    onRefresh();
   };
   
   const isSessionActive = !!activeSession;
@@ -421,6 +422,12 @@ export function AttendanceScannerDialog({
                 Please show your Subject QR Code Generated at least 1 foot to the device camera. Thank you
               </AlertDescription>
             </Alert>
+             {confirmationMessage && (
+                <Alert className="mt-2 bg-green-600/10 border-green-600/20 text-green-700 font-semibold text-lg text-center">
+                    <CheckCircle className="h-5 w-5" />
+                    <AlertTitle>{confirmationMessage}</AlertTitle>
+                </Alert>
+            )}
         </DialogHeader>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start h-full overflow-hidden">
           {/* Left Column: Scanner and Controls */}
@@ -455,17 +462,7 @@ export function AttendanceScannerDialog({
                   </div>
                 </div>
               )}
-               {confirmationMessage && (
-                <div className="absolute inset-0 flex items-center justify-center bg-black/70">
-                    <Card className="bg-green-600/90 text-primary-foreground text-center p-8">
-                        <CardContent className="p-0 flex flex-col items-center gap-4">
-                            <CheckCircle className="w-16 h-16" />
-                            <p className="text-2xl font-bold">{confirmationMessage}</p>
-                        </CardContent>
-                    </Card>
-                </div>
-              )}
-              {isProcessing && !confirmationMessage && (
+              {isProcessing && (
                 <div className="absolute inset-0 flex items-center justify-center bg-black/60">
                   <p className="text-white text-lg animate-pulse">
                     Processing...
