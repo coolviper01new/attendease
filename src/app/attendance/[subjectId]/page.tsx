@@ -8,16 +8,13 @@ import { AttendanceClient } from './components/attendance-client';
 // This is a server-side component to fetch initial data
 async function getSubject(subjectId: string): Promise<Subject | null> {
   try {
-    // IMPORTANT: Using adminApp() directly here for server-side data fetching
     const firestore = getFirestore(adminApp());
-    // Correctly get the document reference using the Admin SDK syntax
     const subjectDocRef = firestore.doc(`subjects/${subjectId}`);
     const subjectSnapshot = await subjectDocRef.get();
 
     if (!subjectSnapshot.exists) {
       return null;
     }
-    // We manually add the id to the data object
     return { id: subjectSnapshot.id, ...subjectSnapshot.data() } as Subject;
   } catch (error) {
     console.error("Error fetching subject in server component:", error);
@@ -29,11 +26,9 @@ export default async function SubjectAttendancePage({ params }: { params: { subj
   const { subjectId } = params;
   const subject = await getSubject(subjectId);
 
-  // If the subject doesn't exist, immediately return a 404
   if (!subject) {
     notFound();
   }
 
-  // Pass the server-fetched subject data to the client component
   return <AttendanceClient subject={subject} />;
 }

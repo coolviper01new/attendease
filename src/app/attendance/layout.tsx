@@ -39,6 +39,5 @@ export default function AttendanceLayout({
   }
 
   // If loading is finished and there's no user, this will be null while the redirect happens.
-  // Or it can show a message, but the redirect is nearly instant.
   return null;
 }
