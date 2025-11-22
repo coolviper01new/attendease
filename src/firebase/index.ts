@@ -8,7 +8,7 @@ import { getFirestore } from 'firebase/firestore';
 // IMPORTANT: DO NOT MODIFY THIS FUNCTION
 export function initializeFirebase() {
   if (typeof window === 'undefined') {
-    // This should ideally not be called from the client bundle.
+    // This should ideally not be called from the server bundle.
     // If it is, it's a sign of a module resolution issue.
     // We throw an error to make it obvious.
     throw new Error("Client-side initializeFirebase called on the server.");
