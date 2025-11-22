@@ -51,7 +51,8 @@ export type Registration = {
   id: string;
   studentId: string;
   subjectId: string;
-  qrCodeSecret: string;
+  block: string;
+  registrationDate: any; // Can be a Date or a Firestore Timestamp
 };
 
 export type AttendanceSession = {
@@ -95,7 +96,6 @@ export type Student = User & {
   role: 'student';
   studentNumber: string;
   course: string;
-  blockId: string;
   deviceId?: string;
   name: string;
 };

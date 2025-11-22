@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { useMemo } from 'react';
-import { AppWindow, User, LogOut } from 'lucide-react';
+import { AppWindow, User, LogOut, BookUser } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import {
@@ -69,6 +69,13 @@ function StudentHeader() {
               className="text-sm font-medium text-muted-foreground transition-colors hover:text-primary"
             >
               <Link href="/student/attendance">My Attendance</Link>
+            </Button>
+             <Button
+              variant="ghost"
+              asChild
+              className="text-sm font-medium text-muted-foreground transition-colors hover:text-primary"
+            >
+              <Link href="/student/enrollment">Enrollment</Link>
             </Button>
           </nav>
           {isLoading ? (

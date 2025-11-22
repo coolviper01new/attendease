@@ -34,7 +34,7 @@ export default function RegisterPage() {
   const [password, setPassword] = useState('');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
-  const [role, setRole] = useState<'admin' | 'student'>('student');
+  const [role, setRole] = useState<'student' | 'admin'>('student');
   
   // Student fields
   const [course, setCourse] = useState('');
@@ -81,6 +81,7 @@ export default function RegisterPage() {
         firstName,
         lastName,
         email: user.email,
+        name: `${firstName} ${lastName}`,
         role,
       };
 

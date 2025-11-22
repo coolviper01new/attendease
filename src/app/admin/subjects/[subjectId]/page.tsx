@@ -23,8 +23,9 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { useDoc, useCollection, useFirestore, useMemoFirebase } from "@/firebase";
 import { doc, collection, query, where } from "firebase/firestore";
-import type { Subject, User, Student } from "@/lib/types";
+import type { Subject, User, Student, Registration } from "@/lib/types";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useEffect, useState } from "react";
 
 export default function SubjectAttendancePage() {
   const params = useParams();
@@ -34,11 +35,41 @@ export default function SubjectAttendancePage() {
   const subjectDocRef = useMemoFirebase(() => doc(firestore, 'subjects', subjectId), [firestore, subjectId]);
   const { data: subject, isLoading: isSubjectLoading } = useDoc<Subject>(subjectDocRef);
 
-  const studentsQuery = useMemoFirebase(() => {
-    if (!subject?.blockId) return null;
-    return query(collection(firestore, 'users'), where('blockId', '==', subject.blockId), where('role', '==', 'student'));
-  }, [firestore, subject?.blockId]);
-  const { data: registeredStudents, isLoading: areStudentsLoading } = useCollection<Student>(studentsQuery);
+  const registrationsQuery = useMemoFirebase(() => {
+    return query(collection(firestore, 'registrations'), where('subjectId', '==', subjectId));
+  }, [firestore, subjectId]);
+  
+  const { data: registrations, isLoading: areRegistrationsLoading } = useCollection<Registration>(registrationsQuery);
+
+  const [registeredStudents, setRegisteredStudents] = useState<(Student & { id: string })[]>([]);
+  const [areStudentsLoading, setAreStudentsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchStudents = async () => {
+      if (registrations && registrations.length > 0) {
+        setAreStudentsLoading(true);
+        const studentIds = registrations.map(reg => reg.studentId);
+        
+        // Firestore 'in' queries are limited to 10 items.
+        // For more, you'd need to batch requests.
+        if (studentIds.length > 0) {
+          const studentsQuery = query(collection(firestore, 'users'), where('__name__', 'in', studentIds));
+          const studentSnapshots = await getDocs(studentsQuery);
+          const students = studentSnapshots.docs.map(doc => ({ id: doc.id, ...doc.data() } as Student & {id: string}));
+          setRegisteredStudents(students);
+        } else {
+           setRegisteredStudents([]);
+        }
+
+        setAreStudentsLoading(false);
+      } else if (!areRegistrationsLoading) {
+        setRegisteredStudents([]);
+        setAreStudentsLoading(false);
+      }
+    };
+    fetchStudents();
+  }, [registrations, areRegistrationsLoading, firestore]);
+  
 
   if (isSubjectLoading) {
     return (
@@ -66,7 +97,7 @@ export default function SubjectAttendancePage() {
     <>
       <PageHeader
         title={subject.name}
-        description={`Manage attendance for ${subject.code}.`}
+        description={`Manage attendance for ${subject.code} (${subject.block}).`}
       >
         <Button variant="outline">
           <StopCircle className="mr-2 h-4 w-4" /> Deactivate Session
@@ -93,7 +124,7 @@ export default function SubjectAttendancePage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {areStudentsLoading ? (
+                {areStudentsLoading || areRegistrationsLoading ? (
                     <TableRow>
                         <TableCell colSpan={3} className="h-24 text-center">
                             Loading students...
@@ -130,7 +161,7 @@ export default function SubjectAttendancePage() {
                 ) : (
                     <TableRow>
                         <TableCell colSpan={3} className="h-24 text-center">
-                            No students enrolled in this block.
+                            No students enrolled in this subject.
                         </TableCell>
                     </TableRow>
                 )}
@@ -142,5 +173,3 @@ export default function SubjectAttendancePage() {
     </>
   );
 }
-
-    

@@ -24,9 +24,10 @@ import {
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 import { useUser, useFirestore, useDoc, useCollection, useMemoFirebase } from '@/firebase';
-import { doc, collection, query, where } from 'firebase/firestore';
-import type { Student, Subject } from '@/lib/types';
+import { doc, collection, query, where, getDocs } from 'firebase/firestore';
+import type { Student, Subject, Registration } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
+import { updateDoc } from 'firebase/firestore';
 
 const QrCodeDialog = ({
   studentId,
@@ -104,21 +105,19 @@ export default function StudentDashboardPage() {
 
   const [currentDeviceId, setCurrentDeviceId] = useState<string | null>(null);
   const [isClient, setIsClient] = useState(false);
+  const [enrolledSubjects, setEnrolledSubjects] = useState<Subject[]>([]);
 
   const userDocRef = useMemoFirebase(() => {
       if (!user) return null;
       return doc(firestore, 'users', user.uid);
   }, [user, firestore]);
-  const { data: student, isLoading: isStudentLoading } = useDoc<Student>(userDocRef);
-
-  // This is not efficient, a real app should probably denormalize student blockId onto registrations
-  // or have a more direct way to get subjects.
-  const subjectsQuery = useMemoFirebase(() => {
-    if (!student?.blockId) return null;
-    return query(collection(firestore, 'subjects'), where('blockId', '==', student.blockId));
-  }, [firestore, student?.blockId]);
-  const { data: subjects, isLoading: areSubjectsLoading } = useCollection<Subject>(subjectsQuery);
+  const { data: student, isLoading: isStudentLoading, forceRefresh: refreshStudent } = useDoc<Student>(userDocRef);
   
+  const registrationsQuery = useMemoFirebase(() => {
+    if (!user) return null;
+    return query(collection(firestore, 'users', user.uid, 'registrations'));
+  }, [firestore, user]);
+  const { data: userRegistrations, isLoading: areRegsLoading } = useCollection<Registration>(registrationsQuery);
 
   useEffect(() => {
     setIsClient(true);
@@ -126,26 +125,51 @@ export default function StudentDashboardPage() {
     localStorage.setItem('deviceId', deviceId);
     setCurrentDeviceId(deviceId);
   }, []);
+  
+   useEffect(() => {
+    const fetchEnrolledSubjects = async () => {
+      if (userRegistrations && userRegistrations.length > 0) {
+        const subjectIds = userRegistrations.map(reg => reg.subjectId);
+        if (subjectIds.length === 0) {
+            setEnrolledSubjects([]);
+            return;
+        }
+        const subjectsQuery = query(collection(firestore, 'subjects'), where('__name__', 'in', subjectIds));
+        const subjectsSnapshot = await getDocs(subjectsQuery);
+        const subjectsData = subjectsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Subject));
+        setEnrolledSubjects(subjectsData);
+      } else {
+        setEnrolledSubjects([]);
+      }
+    };
 
-  const handleRegisterDevice = () => {
-    if (!userDocRef) return;
-    // In a real app, this would be a server action to register the device.
-    // For now, we'll simulate it on the client.
-    console.log("Registering device...");
-    // Ideally this would be an updateDocumentNonBlocking call
-    // For now, let's just toast.
-    toast({
-        title: "Device Registered",
-        description: "This device has been successfully registered for QR code generation.",
-    });
-    // This would typically trigger a re-render with the new state.
-    // window.location.reload(); 
-    // The useDoc hook should handle the update automatically. We need to implement the update first.
+    fetchEnrolledSubjects();
+  }, [userRegistrations, firestore]);
+
+
+  const handleRegisterDevice = async () => {
+    if (!userDocRef || !currentDeviceId) return;
+
+    try {
+        await updateDoc(userDocRef, { deviceId: currentDeviceId });
+        toast({
+            title: "Device Registered",
+            description: "This device has been successfully registered for QR code generation.",
+        });
+        refreshStudent();
+    } catch (error) {
+        console.error("Device registration error:", error);
+        toast({
+            variant: "destructive",
+            title: "Registration Failed",
+            description: "Could not register this device. Please try again."
+        })
+    }
   };
 
   const isDeviceRegistered = !!student?.deviceId;
   const isCurrentDevice = isDeviceRegistered && student?.deviceId === currentDeviceId;
-  const isLoading = isUserLoading || isStudentLoading || areSubjectsLoading;
+  const isLoading = isUserLoading || isStudentLoading || areRegsLoading;
   
   if (isLoading) {
     return (
@@ -194,7 +218,7 @@ export default function StudentDashboardPage() {
       )}
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {subjects && subjects.map((subject) => (
+        {enrolledSubjects && enrolledSubjects.map((subject) => (
           <Card key={subject.id} className="flex flex-col">
             <CardHeader>
               <div className="flex items-start justify-between">
@@ -202,7 +226,7 @@ export default function StudentDashboardPage() {
                   <CardTitle className="font-headline text-xl mb-1">
                     {subject.name}
                   </CardTitle>
-                  <CardDescription>{subject.code}</CardDescription>
+                  <CardDescription>{subject.code} ({subject.block})</CardDescription>
                 </div>
                 <div className="bg-primary/10 text-primary p-2 rounded-lg">
                   <BookOpen className="w-5 h-5" />
@@ -210,16 +234,14 @@ export default function StudentDashboardPage() {
               </div>
             </CardHeader>
             <CardContent className="flex-grow">
-              <div className="flex items-center text-sm text-muted-foreground">
-                <Clock className="mr-2 h-4 w-4" />
-                <span>
-                  {subject.schedule.day}, {subject.schedule.startTime} -{' '}
-                  {subject.schedule.endTime}
-                </span>
-              </div>
-              <p className="text-sm text-muted-foreground mt-1">
-                Room: {subject.schedule.room}
-              </p>
+               {subject.schedules.map((schedule, index) => (
+                <div key={index} className="flex items-center text-sm text-muted-foreground mt-1">
+                  <Clock className="mr-2 h-4 w-4 flex-shrink-0" />
+                  <span className="truncate">
+                    {schedule.day}, {schedule.startTime} - {schedule.endTime} @ {schedule.room}
+                  </span>
+                </div>
+              ))}
             </CardContent>
             <CardFooter>
               {isClient && student && (
@@ -235,10 +257,10 @@ export default function StudentDashboardPage() {
           </Card>
         ))}
       </div>
-       {subjects?.length === 0 && (
+       {enrolledSubjects.length === 0 && (
           <Card className="mt-6">
               <CardContent className="pt-6">
-                  <p className="text-center text-muted-foreground">You are not enrolled in any subjects for this semester.</p>
+                  <p className="text-center text-muted-foreground">You are not enrolled in any subjects. Go to the Enrollment page to get started.</p>
               </CardContent>
           </Card>
       )}
