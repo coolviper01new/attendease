@@ -56,7 +56,7 @@ export default function SubjectAttendancePage() {
     let isMounted = true;
     
     const fetchAllData = async () => {
-      if (!subjectId) return;
+      if (!subjectId || !firestore) return;
 
       setIsLoading(true);
 
@@ -92,50 +92,53 @@ export default function SubjectAttendancePage() {
   useEffect(() => {
       let isMounted = true;
       const fetchStudentDetails = async () => {
-          if (attendanceRecords && subject) {
-            if (attendanceRecords.length === 0) {
-              if (isMounted) setPresentStudents([]);
-              setIsLoading(false); 
-              return;
-            }
+          if (!attendanceRecords || !subject) {
+            setIsLoading(false);
+            return;
+          }
 
-              const studentIds = attendanceRecords.map(att => att.studentId);
-              if (studentIds.length === 0) {
-                if (isMounted) setPresentStudents([]);
-                setIsLoading(false);
-                return;
-              };
+          if (attendanceRecords.length === 0) {
+            if (isMounted) setPresentStudents([]);
+            setIsLoading(false); 
+            return;
+          }
 
-              const studentChunks = [];
-              for (let i = 0; i < studentIds.length; i += 30) {
-                  studentChunks.push(studentIds.slice(i, i + 30));
-              }
+          const studentIds = attendanceRecords.map(att => att.studentId);
+          if (studentIds.length === 0) {
+            if (isMounted) setPresentStudents([]);
+            setIsLoading(false);
+            return;
+          };
 
-              try {
-                const studentPromises = studentChunks.map(chunk => 
-                    getDocs(query(collection(firestore, 'users'), where('__name__', 'in', chunk)))
-                );
-                const studentSnapshots = await Promise.all(studentPromises);
-                if (!isMounted) return;
+          const studentChunks = [];
+          for (let i = 0; i < studentIds.length; i += 30) {
+              studentChunks.push(studentIds.slice(i, i + 30));
+          }
 
-                const studentsData = studentSnapshots.flatMap(snapshot => 
-                    snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Student & {id: string}))
-                );
-                setPresentStudents(studentsData);
-              } catch(e) {
-                console.error("Error fetching student details:", e);
-                setPresentStudents([]);
-              } finally {
-                if(isMounted) setIsLoading(false);
-              }
-          } else if (subject) { 
-              if (isMounted) setPresentStudents([]);
-              setIsLoading(false);
+          try {
+            const studentPromises = studentChunks.map(chunk => 
+                getDocs(query(collection(firestore, 'users'), where('__name__', 'in', chunk)))
+            );
+            const studentSnapshots = await Promise.all(studentPromises);
+            if (!isMounted) return;
+
+            const studentsData = studentSnapshots.flatMap(snapshot => 
+                snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Student & {id: string}))
+            );
+            setPresentStudents(studentsData);
+          } catch(e) {
+            console.error("Error fetching student details:", e);
+            setPresentStudents([]);
+          } finally {
+            if(isMounted) setIsLoading(false);
           }
       };
 
       if (subject) {
         fetchStudentDetails();
+      } else {
+        // If there's no subject after the initial fetch, stop loading.
+        setIsLoading(false);
       }
 
       return () => {
@@ -430,6 +433,5 @@ export default function SubjectAttendancePage() {
     </div>
   );
 }
-
 
     
