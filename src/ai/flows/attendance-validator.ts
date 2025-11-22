@@ -15,11 +15,8 @@ import {z} from 'genkit';
 
 const ValidateAttendanceInputSchema = z.object({
   qrCodeData: z.string().describe('The JSON string data extracted from the QR code.'),
-  subjectId: z.string().describe('The ID of the subject for which attendance is being recorded.'),
-  studentId: z.string().describe('The ID of the student whose attendance is being recorded.'),
   qrCodeSecret: z.string().describe('The secret key for the currently active attendance session.'),
   attendanceSessionActive: z.boolean().describe('Indicates if the attendance session is currently active.'),
-  studentRegistered: z.boolean().describe('Indicates if the student is registered for the subject.'),
 });
 export type ValidateAttendanceInput = z.infer<typeof ValidateAttendanceInputSchema>;
 
@@ -41,12 +38,10 @@ const validateAttendancePrompt = ai.definePrompt({
 
   Your task is to determine if an attendance entry is valid. A valid entry must satisfy ALL of the following conditions:
   1. The attendance session for the subject must be active.
-  2. The student must be registered for the subject.
-  3. The 'qrCodeSecret' from the QR code must exactly match the 'qrCodeSecret' of the active session.
+  2. The 'qrCodeSecret' from the QR code must exactly match the 'qrCodeSecret' of the active session.
 
   Here is the information for the current attempt:
   - Attendance Session is Active: {{{attendanceSessionActive}}}
-  - Student is Registered: {{{studentRegistered}}}
   - Active Session's Secret Key: {{{qrCodeSecret}}}
   - QR Code Data (JSON String): {{{qrCodeData}}}
 
@@ -55,7 +50,7 @@ const validateAttendancePrompt = ai.definePrompt({
 
   Based on all conditions, determine if the attendance is valid.
   - If valid, set 'isValid' to true and 'reason' to "Attendance validated."
-  - If invalid, set 'isValid' to false and provide a clear, single reason for the failure (e.g., "QR code is for a different session.", "Student is not registered for this subject.", "Attendance session is not active.").
+  - If invalid, set 'isValid' to false and provide a clear, single reason for the failure (e.g., "QR code is for a different session.", "Attendance session is not active.").
   `,
 });
 

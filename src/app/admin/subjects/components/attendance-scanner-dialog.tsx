@@ -110,26 +110,30 @@ export function AttendanceScannerDialog({
       setPresentStudents([]);
       return;
     }
-    const studentIds = attendanceRecords.map((att) => att.studentId);
-    if (studentIds.length === 0) {
-      setPresentStudents([]);
-      return;
-    }
-    
-    const fetchStudents = async () => {
-        try {
-             const studentRefs = studentIds.map(id => doc(firestore, 'users', id));
-             const studentSnaps = await Promise.all(studentRefs.map(ref => getDoc(ref)));
-             const studentsData = studentSnaps
-                .filter(snap => snap.exists())
-                .map(snap => ({ id: snap.id, ...snap.data() } as Student & {id: string}));
-            setPresentStudents(studentsData.sort((a, b) => a.firstName.localeCompare(b.firstName)));
-        } catch (error) {
-            console.error("Error fetching present students:", error);
-        }
-    };
 
-    fetchStudents();
+    const fetchNewStudents = async () => {
+      const currentStudentIds = presentStudents.map(p => p.id);
+      const newAttendanceRecords = attendanceRecords.filter(att => !currentStudentIds.includes(att.studentId));
+
+      if (newAttendanceRecords.length === 0) return;
+
+      const newStudentIds = newAttendanceRecords.map(att => att.studentId);
+      
+      try {
+        const studentRefs = newStudentIds.map(id => doc(firestore, 'users', id));
+        const studentSnaps = await Promise.all(studentRefs.map(ref => getDoc(ref)));
+        const newStudentsData = studentSnaps
+           .filter(snap => snap.exists())
+           .map(snap => ({ id: snap.id, ...snap.data() } as Student & {id: string}));
+
+        setPresentStudents(prevStudents => [...prevStudents, ...newStudentsData].sort((a, b) => a.firstName.localeCompare(b.firstName)));
+      } catch (error) {
+          console.error("Error fetching new students:", error);
+      }
+    };
+    
+    fetchNewStudents();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [attendanceRecords, firestore]);
   
 
@@ -154,17 +158,25 @@ export function AttendanceScannerDialog({
     }
 
     const getCameraPermission = async () => {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: 'environment' },
-        });
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
+      // only ask for permission if it's not been determined yet
+      if (hasCameraPermission === null) {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: 'environment' },
+          });
+          if (videoRef.current) {
+            videoRef.current.srcObject = stream;
+          }
           setHasCameraPermission(true);
+        } catch (error) {
+          console.error('Error accessing camera:', error);
+          setHasCameraPermission(false);
+          toast({
+            variant: 'destructive',
+            title: 'Camera Access Denied',
+            description: 'Please enable camera permissions in your browser settings to use this feature.',
+          });
         }
-      } catch (error) {
-        console.error('Error accessing camera:', error);
-        setHasCameraPermission(false);
       }
     };
 
@@ -178,9 +190,10 @@ export function AttendanceScannerDialog({
        if (videoRef.current?.srcObject) {
         const stream = videoRef.current.srcObject as MediaStream;
         stream.getTracks().forEach(track => track.stop());
+        videoRef.current.srcObject = null;
       }
     };
-  }, [open]);
+  }, [open, hasCameraPermission, toast]);
 
   useEffect(() => {
     if (videoRef.current && hasCameraPermission && !qrScannerRef.current) {
@@ -225,28 +238,14 @@ export function AttendanceScannerDialog({
         });
         return;
       }
-      
-      const studentRegQuery = query(collectionGroup(firestore, 'registrations'), where('studentId', '==', qrData.studentId), where('subjectId', '==', subject.id));
-      
-      const studentRegSnapshot = await getDocs(studentRegQuery).catch(serverError => {
-        const permissionError = new FirestorePermissionError({
-            path: 'registrations', // Path for a collection group query
-            operation: 'list',
-        });
-        errorEmitter.emit('permission-error', permissionError);
-        // Re-throw to stop execution in the main try-block
-        throw permissionError;
-      });
 
-      const isRegistered = !studentRegSnapshot.empty;
+      // The check for student registration is removed from here.
+      // We now trust the QR code's integrity.
 
       const validationInput = {
         qrCodeData: scannedData,
-        subjectId: subject.id,
-        studentId: qrData.studentId,
         qrCodeSecret: activeSession.qrCodeSecret,
         attendanceSessionActive: activeSession.isActive,
-        studentRegistered: isRegistered,
       };
 
       const result = await validateAttendance(validationInput);
@@ -348,6 +347,7 @@ export function AttendanceScannerDialog({
       activeSession.id
     );
     await updateDoc(sessionRef, { isActive: false, endTime: serverTimestamp() });
+    setPresentStudents([]); // Clear the list when session stops
     toast({ title: 'Attendance Session Stopped' });
     onRefresh();
   };
@@ -355,7 +355,12 @@ export function AttendanceScannerDialog({
   const isSessionActive = !!activeSession;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(isOpen) => {
+        if (!isOpen) {
+            handleStopSession(); // Ensure session is stopped when dialog is closed
+        }
+        onOpenChange(isOpen);
+    }}>
       <DialogContent className="max-w-6xl h-[90vh]">
         <DialogHeader>
           <DialogTitle>Attendance Scanner: {subject.name}</DialogTitle>
