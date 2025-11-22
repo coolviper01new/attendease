@@ -86,44 +86,41 @@ const ScheduleArray = ({ control, name, label, description }: { control: any, na
         }
     };
 
-    const handleCopySchedule = (targetIndex: number) => {
-        const currentDay = (fields[targetIndex] as any).day;
-        const currentDayOrder = daysOfWeek.indexOf(currentDay);
-        
-        let sourceIndex = -1;
-        let sourceDay = '';
+    const handleCopySchedule = (targetDay: string) => {
+      const allFormSchedules = control.getValues(name) as { day: string; startTime: string; endTime: string; room: string}[];
+      const targetFieldIndex = allFormSchedules.findIndex(f => f.day === targetDay);
+      const targetDayOrder = daysOfWeek.indexOf(targetDay);
+      
+      let sourceSchedule = null;
 
-        // Find the index of the most recently checked day before the current one
-        for (let i = currentDayOrder - 1; i >= 0; i--) {
-            const prevDay = daysOfWeek[i];
-            const foundIndex = fields.findIndex(field => (field as any).day === prevDay);
-            if (foundIndex > -1) {
-                sourceIndex = foundIndex;
-                sourceDay = prevDay;
-                break;
-            }
+      // Search backwards from the target day to find the most recent checked day
+      for (let i = targetDayOrder - 1; i >= 0; i--) {
+        const prevDay = daysOfWeek[i];
+        const foundSchedule = allFormSchedules.find(f => f.day === prevDay);
+        if (foundSchedule) {
+            sourceSchedule = foundSchedule;
+            break;
         }
+      }
 
-        if (sourceIndex === -1) {
-          toast({
-            variant: 'destructive',
-            title: 'Cannot Copy',
-            description: 'There is no previous checked day to copy from.',
+      if (sourceSchedule) {
+          update(targetFieldIndex, {
+              ...allFormSchedules[targetFieldIndex],
+              startTime: sourceSchedule.startTime,
+              endTime: sourceSchedule.endTime,
+              room: sourceSchedule.room,
           });
-          return;
-        }
-      
-        const sourceSchedule = control.getValues(`${name}.${sourceIndex}`);
-        if (!sourceSchedule) return;
-      
-        const { startTime, endTime, room } = sourceSchedule;
-      
-        update(targetIndex, { ...(fields[targetIndex] as any), startTime, endTime, room });
-
-        toast({
-          title: 'Schedule Copied',
-          description: `Schedule from ${sourceDay} has been copied to ${currentDay}.`,
-        });
+          toast({
+              title: 'Schedule Copied',
+              description: `Schedule from ${sourceSchedule.day} has been copied to ${targetDay}.`,
+          });
+      } else {
+          toast({
+              variant: 'destructive',
+              title: 'Cannot Copy',
+              description: 'There is no previous checked day to copy from.',
+          });
+      }
     };
 
     return (
@@ -195,8 +192,8 @@ const ScheduleArray = ({ control, name, label, description }: { control: any, na
                         type="button" 
                         variant="ghost" 
                         size="icon"
-                        onClick={() => handleCopySchedule(fieldIndex)}
-                        aria-label="Copy schedule from previous checked day"
+                        onClick={() => handleCopySchedule(day)}
+                        aria-label={`Copy schedule to ${day}`}
                       >
                         <Copy className="h-4 w-4" />
                       </Button>
@@ -478,3 +475,5 @@ export function AddSubjectForm({ onSuccess, subject }: AddSubjectFormProps) {
     </Form>
   );
 }
+
+    
