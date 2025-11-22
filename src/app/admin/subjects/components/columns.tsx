@@ -192,7 +192,6 @@ const DeleteSubjectAction = ({ subject, onDeleted }: { subject: Subject; onDelet
     const handleDelete = async () => {
         setIsSubmitting(true);
         try {
-            // 1. Check for existing enrollments
             const registrationsQuery = query(collectionGroup(firestore, 'registrations'), where('subjectId', '==', subject.id));
             const registrationsSnapshot = await getDocs(registrationsQuery);
 
@@ -205,34 +204,24 @@ const DeleteSubjectAction = ({ subject, onDeleted }: { subject: Subject; onDelet
                 setIsSubmitting(false);
                 return;
             }
-            
-            // 2. If no enrollments, proceed with deletion
+
             const subjectRef = doc(firestore, 'subjects', subject.id);
+            await deleteDoc(subjectRef);
             
-            // Use .catch() for permission error handling instead of try/catch
-            deleteDoc(subjectRef).then(() => { 
-                toast({
-                    title: 'Subject Deleted',
-                    description: `${subject.name} (${subject.block}) has been deleted.`,
-                });
-                onDeleted();
-            }).catch((serverError) => {
-                 const permissionError = new FirestorePermissionError({
-                    path: `subjects/${subject.id}`,
-                    operation: 'delete',
-                });
-                errorEmitter.emit('permission-error', permissionError);
-            }).finally(() => {
-                setIsSubmitting(false);
+            toast({
+                title: 'Subject Deleted',
+                description: `${subject.name} (${subject.block}) has been deleted.`,
             });
+            onDeleted();
 
         } catch (error) {
-            console.error("Error checking registrations:", error);
-             toast({
-                variant: 'destructive',
-                title: 'Error',
-                description: 'Could not check for enrollments. Please try again.',
+            console.error("Error deleting subject:", error);
+            const permissionError = new FirestorePermissionError({
+                path: `subjects/${subject.id}`,
+                operation: 'delete',
             });
+            errorEmitter.emit('permission-error', permissionError);
+        } finally {
             setIsSubmitting(false);
         }
     };
@@ -274,7 +263,7 @@ const ActionsCell = ({ row, onEdit, onRefresh }: { row: any, onEdit: (subject: S
     const subject = row.original as Subject;
     
     if (row.getIsGrouped()) {
-        return null; // Don't show actions on the grouped header row
+        return null; 
     }
 
     return (
@@ -321,7 +310,7 @@ export const getColumns = ({ onEdit, onRefresh }: GetColumnsProps): ColumnDef<Su
     cell: ({ row }) => (
       <div className="pl-4">
         {row.getIsGrouped() ? (
-          <div className="font-bold">{row.original.name}</div>
+          <div className="font-bold">{row.getValue("name")}</div>
         ) : (
           <Link href={`/admin/subjects/${row.original.id}`} className="hover:underline">
             <div className="font-medium">{row.original.name}</div>
@@ -336,12 +325,18 @@ export const getColumns = ({ onEdit, onRefresh }: GetColumnsProps): ColumnDef<Su
   {
     accessorKey: "block",
     header: "Block",
-    cell: ({ row }) => <Badge variant="outline">{row.original.block}</Badge>,
+    cell: ({ row }) => {
+      if (row.getIsGrouped()) {
+        return null;
+      }
+      return <Badge variant="outline">{row.original.block}</Badge>
+    },
   },
   {
       id: "schedules",
       header: "Schedule",
       cell: ({row}) => {
+        if (row.getIsGrouped()) return null;
         const { lectureSchedules, labSchedules, hasLab } = row.original;
         if (!lectureSchedules || lectureSchedules.length === 0) return <span className="text-xs text-muted-foreground">Not set</span>;
         
@@ -376,12 +371,16 @@ export const getColumns = ({ onEdit, onRefresh }: GetColumnsProps): ColumnDef<Su
     {
     accessorKey: "credits",
     header: () => <div className="text-center">Credits</div>,
-    cell: ({row}) => <div className="text-center">{row.original.credits}</div>
+    cell: ({row}) => {
+        if (row.getIsGrouped()) return null;
+        return <div className="text-center">{row.original.credits}</div>
+    }
   },
   {
     id: "enrollmentStatus",
     header: "Enrollment",
     cell: ({ row }) => {
+        if (row.getIsGrouped()) return null;
         const status = row.original.enrollmentStatus;
         return (
             <Badge variant={status === 'open' ? 'default' : 'secondary'}
@@ -395,12 +394,13 @@ export const getColumns = ({ onEdit, onRefresh }: GetColumnsProps): ColumnDef<Su
   {
     id: "sessionStatus",
     header: "Session Status",
-    cell: ({ row }) => <SessionToggle subjectId={row.original.id} />,
+    cell: ({ row }) => {
+        if (row.getIsGrouped()) return null;
+        return <SessionToggle subjectId={row.original.id} />
+    },
   },
   {
     id: "actions",
     cell: (props) => <ActionsCell {...props} onEdit={onEdit} onRefresh={onRefresh} />,
   },
 ];
-
-    

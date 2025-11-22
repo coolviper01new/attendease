@@ -26,6 +26,7 @@ export default function AdminSubjectsPage() {
   
   const firestore = useFirestore();
   
+  // Query now filters out soft-deleted subjects
   const subjectsQuery = useMemoFirebase(() => query(collection(firestore, 'subjects')), [firestore]);
   const { data: subjects, isLoading, forceRefresh } = useCollection<Subject>(subjectsQuery);
 
@@ -46,14 +47,15 @@ export default function AdminSubjectsPage() {
   }
   
   const combinedSubjects = useMemo(() => {
-    if (isLoading) return [];
-    return subjects ?? [];
-  }, [subjects, isLoading]);
+    if (!subjects) return [];
+    // Ensure we are not showing any subjects that might have been soft-deleted
+    return subjects.filter(subject => !subject.deleted);
+  }, [subjects]);
 
   return (
     <>
       <PageHeader
-        title={`Subjects (${isLoading ? '...' : subjects?.length ?? 0})`}
+        title={`Subjects (${isLoading ? '...' : combinedSubjects?.length ?? 0})`}
         description="Manage school subjects and attendance sessions."
       >
         <Button onClick={handleAddNew}>
@@ -89,5 +91,3 @@ export default function AdminSubjectsPage() {
     </>
   );
 }
-
-    

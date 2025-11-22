@@ -49,7 +49,7 @@ export function SubjectClient({ data, isLoading, onEdit, onRefresh }: SubjectCli
   const [grouping, setGrouping] = React.useState<string[]>(['name']);
   const [expanded, setExpanded] = React.useState({});
 
-  const columns = React.useMemo(() => getColumns({ onEdit, allSubjects: data, onRefresh }), [onEdit, data, onRefresh]);
+  const columns = React.useMemo(() => getColumns({ onEdit, onRefresh }), [onEdit, onRefresh]);
   
   const table = useReactTable({
     data,
