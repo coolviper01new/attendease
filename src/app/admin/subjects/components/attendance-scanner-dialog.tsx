@@ -47,8 +47,6 @@ import type {
   Attendance,
   Student,
 } from '@/lib/types';
-import { errorEmitter } from '@/firebase/error-emitter';
-import { FirestorePermissionError } from '@/firebase/errors';
 
 interface AttendanceScannerDialogProps {
   subject: Subject;
@@ -68,6 +66,8 @@ export function AttendanceScannerDialog({
   const { toast } = useToast();
   const videoRef = useRef<HTMLVideoElement>(null);
   const qrScannerRef = useRef<QrScanner | null>(null);
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+
 
   const [hasCameraPermission, setHasCameraPermission] = useState<
     boolean | null
@@ -78,6 +78,7 @@ export function AttendanceScannerDialog({
   const [presentStudents, setPresentStudents] = useState<
     (Student & { id: string })[]
   >([]);
+  const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
 
   // --- Data Fetching Hooks ---
   const activeSessionQuery = useMemoFirebase(
@@ -142,6 +143,53 @@ export function AttendanceScannerDialog({
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
+
+  const handleStopSession = useCallback(async () => {
+    if (!activeSession) {
+      toast({ title: 'No active session to stop.' });
+      return;
+    }
+    const sessionRef = doc(
+      firestore,
+      'subjects',
+      subject.id,
+      'attendanceSessions',
+      activeSession.id
+    );
+    await updateDoc(sessionRef, { isActive: false, endTime: serverTimestamp() });
+    setPresentStudents([]); // Clear the list when session stops
+    toast({ title: 'Attendance Session Stopped' });
+    if(intervalRef.current) clearInterval(intervalRef.current);
+    setTimeRemaining(null);
+    onRefresh();
+  }, [activeSession, firestore, subject.id, onRefresh, toast]);
+
+
+  // Countdown timer effect
+  useEffect(() => {
+    if (activeSession && timeRemaining === null) {
+      // Session is active, but timer hasn't started, so start it.
+      // This handles re-opening the dialog with an already-active session.
+      // For simplicity, we'll just start a new 20min timer.
+      // A more complex implementation could store expiry time in Firestore.
+      setTimeRemaining(20 * 60);
+    }
+
+    if (timeRemaining !== null && timeRemaining > 0) {
+      intervalRef.current = setInterval(() => {
+        setTimeRemaining(prev => (prev ? prev - 1 : 0));
+      }, 1000);
+    } else if (timeRemaining === 0) {
+      handleStopSession();
+    }
+    
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+    };
+  }, [timeRemaining, activeSession, handleStopSession]);
+
 
   // --- Camera and QR Scanner Effects ---
   useEffect(() => {
@@ -325,6 +373,7 @@ export function AttendanceScannerDialog({
       isActive: true,
       qrCodeSecret: newSessionSecret,
     });
+    setTimeRemaining(20 * 60); // Start 20 minute timer
     toast({
       title: 'Attendance Session Started',
       description: 'You can now start scanning student QR codes.',
@@ -332,26 +381,14 @@ export function AttendanceScannerDialog({
     refreshSessions();
     onRefresh();
   };
-
-  const handleStopSession = async () => {
-    if (!activeSession) {
-      toast({ title: 'No active session to stop.' });
-      return;
-    }
-    const sessionRef = doc(
-      firestore,
-      'subjects',
-      subject.id,
-      'attendanceSessions',
-      activeSession.id
-    );
-    await updateDoc(sessionRef, { isActive: false, endTime: serverTimestamp() });
-    setPresentStudents([]); // Clear the list when session stops
-    toast({ title: 'Attendance Session Stopped' });
-    onRefresh();
-  };
   
   const isSessionActive = !!activeSession;
+  const formatTime = (seconds: number) => {
+    const minutes = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => {
@@ -409,19 +446,25 @@ export function AttendanceScannerDialog({
               )}
             </div>
 
-            <div className="flex-shrink-0">
+            <div className="flex-shrink-0 grid grid-cols-2 gap-2">
                 {!isSessionActive ? (
-                  <Button onClick={handleStartSession} className="w-full">
+                  <Button onClick={handleStartSession} className="w-full col-span-2">
                     <PlayCircle className="mr-2 h-4 w-4" /> Start Session
                   </Button>
                 ) : (
-                  <Button
-                    onClick={handleStopSession}
-                    variant="destructive"
-                    className="w-full"
-                  >
-                    <StopCircle className="mr-2 h-4 w-4" /> Stop Session
-                  </Button>
+                  <>
+                    <Button
+                        onClick={handleStopSession}
+                        variant="destructive"
+                        className="w-full"
+                    >
+                        <StopCircle className="mr-2 h-4 w-4" /> Stop Session
+                    </Button>
+                     <Button variant="outline" className="w-full" disabled>
+                        <Clock className="mr-2 h-4 w-4 animate-pulse" />
+                        {timeRemaining !== null ? formatTime(timeRemaining) : '00:00'}
+                    </Button>
+                  </>
                 )}
             </div>
              <Card className="flex-shrink-0">
