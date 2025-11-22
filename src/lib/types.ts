@@ -1,4 +1,5 @@
 
+
 export type SchoolYear = {
   id: string;
   name: string;
@@ -72,10 +73,10 @@ export type Attendance = {
   id:string;
   studentId: string;
   subjectId: string;
-  date: string;
+  timestamp: any;
   status: AttendanceStatus;
   recordedBy: string; // adminId
-  timestamp: any;
+  date: string;
 };
 
 export type Warning = {
