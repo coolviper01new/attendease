@@ -60,11 +60,6 @@ interface AttendanceScannerDialogProps {
   onRefresh: () => void;
 }
 
-type ScannedStudentInfo = {
-    name: string;
-    avatarUrl?: string;
-};
-
 export function AttendanceScannerDialog({
   subject,
   open,
@@ -104,50 +99,39 @@ export function AttendanceScannerDialog({
     useCollection<AttendanceSession>(activeSessionQuery);
   const activeSession = activeSessions?.[0];
 
-  const sessionAttendanceQuery = useMemoFirebase(() => {
-    if (!activeSession) return null;
-    return query(
-      collection(
-        firestore,
-        `subjects/${subject.id}/attendanceSessions/${activeSession.id}/attendance`
-      )
-    );
-  }, [firestore, subject.id, activeSession]);
-  const { data: attendanceRecords } =
-    useCollection<Attendance>(sessionAttendanceQuery);
-
-  // --- Effect to fetch student details ---
+  // This effect runs when the dialog opens with an active session, to load already-present students.
   useEffect(() => {
-    if (!attendanceRecords) {
-      setPresentStudents([]);
-      return;
-    }
-
-    const fetchNewStudents = async () => {
-      const currentStudentIds = presentStudents.map(p => p.id);
-      const newAttendanceRecords = attendanceRecords.filter(att => !currentStudentIds.includes(att.studentId));
-
-      if (newAttendanceRecords.length === 0) return;
-
-      const newStudentIds = newAttendanceRecords.map(att => att.studentId);
-      
-      try {
-        const studentRefs = newStudentIds.map(id => doc(firestore, 'users', id));
-        const studentSnaps = await Promise.all(studentRefs.map(ref => getDoc(ref)));
-        const newStudentsData = studentSnaps
-           .filter(snap => snap.exists())
-           .map(snap => ({ id: snap.id, ...snap.data() } as Student & {id: string}));
-
-        setPresentStudents(prevStudents => [...prevStudents, ...newStudentsData].sort((a, b) => a.firstName.localeCompare(b.firstName)));
-      } catch (error) {
-          console.error("Error fetching new students:", error);
+    const fetchInitialAttendees = async () => {
+      if (activeSession && open) {
+        const attendanceSnapshot = await getDocs(
+          collection(
+            firestore,
+            `subjects/${subject.id}/attendanceSessions/${activeSession.id}/attendance`
+          )
+        );
+        const attendanceRecords = attendanceSnapshot.docs.map(d => d.data() as Attendance);
+        
+        if (attendanceRecords.length > 0) {
+          const studentIds = attendanceRecords.map(att => att.studentId);
+          const studentRefs = studentIds.map(id => doc(firestore, 'users', id));
+          const studentSnaps = await Promise.all(studentRefs.map(ref => getDoc(ref)));
+          const studentsData = studentSnaps
+            .filter(snap => snap.exists())
+            .map(snap => ({ id: snap.id, ...snap.data() } as Student & { id: string }));
+          
+          setPresentStudents(studentsData.sort((a, b) => a.firstName.localeCompare(b.firstName)));
+        } else {
+            setPresentStudents([]);
+        }
+      } else if (!open) {
+        // Clear list when dialog closes
+        setPresentStudents([]);
       }
     };
     
-    fetchNewStudents();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [attendanceRecords, firestore]);
-  
+    fetchInitialAttendees();
+  }, [activeSession, open, firestore, subject.id]);
+
 
   // --- Clock effect ---
   useEffect(() => {
@@ -180,10 +164,14 @@ export function AttendanceScannerDialog({
   useEffect(() => {
     if (activeSession && timeRemaining === null) {
       // Session is active, but timer hasn't started, so start it.
-      // This handles re-opening the dialog with an already-active session.
-      // For simplicity, we'll just start a new 20min timer.
-      // A more complex implementation could store expiry time in Firestore.
-      setTimeRemaining(20 * 60);
+      const sessionStartTime = (activeSession.startTime as any)?.toDate();
+      if (sessionStartTime) {
+          const elapsedSeconds = Math.floor((new Date().getTime() - sessionStartTime.getTime()) / 1000);
+          const remaining = (20 * 60) - elapsedSeconds;
+          setTimeRemaining(remaining > 0 ? remaining : 0);
+      } else {
+          setTimeRemaining(20 * 60);
+      }
     }
 
     if (timeRemaining !== null && timeRemaining > 0) {
@@ -297,7 +285,6 @@ export function AttendanceScannerDialog({
         return;
       }
       
-      // The AI will validate the secret.
       const validationInput = {
         qrCodeData: scannedData,
         qrCodeSecret: activeSession.qrCodeSecret,
@@ -308,21 +295,33 @@ export function AttendanceScannerDialog({
 
       if (result.isValid) {
         const studentDoc = await getDoc(doc(firestore, 'users', qrData.studentId));
-        const studentData = studentDoc.data() as Student | undefined;
         
-        const attendanceDocRef = doc(firestore, `subjects/${subject.id}/attendanceSessions/${activeSession.id}/attendance`, qrData.studentId);
-        await setDoc(attendanceDocRef, {
-          studentId: qrData.studentId,
-          subjectId: subject.id,
-          timestamp: serverTimestamp(),
-          status: 'present',
-          recordedBy: adminUser.uid,
-          date: new Date().toISOString().split('T')[0],
-        });
-
-        if (studentData) {
+        if (studentDoc.exists()) {
+            const studentData = { id: studentDoc.id, ...studentDoc.data() } as Student & { id: string };
             const studentName = `${studentData.firstName} ${studentData.lastName}`;
+            
+            // 1. Set the confirmation message
             setConfirmationMessage(`${studentName}'s attendance is recorded`);
+            
+            // 2. Manually add student to the local list
+            setPresentStudents(prev => [...prev, studentData].sort((a,b) => a.firstName.localeCompare(b.firstName)));
+
+            // 3. Write to the database in the background
+            const attendanceDocRef = doc(firestore, `subjects/${subject.id}/attendanceSessions/${activeSession.id}/attendance`, qrData.studentId);
+            setDoc(attendanceDocRef, {
+              studentId: qrData.studentId,
+              subjectId: subject.id,
+              timestamp: serverTimestamp(),
+              status: 'present',
+              recordedBy: adminUser.uid,
+              date: new Date().toISOString().split('T')[0],
+            });
+        } else {
+             toast({
+              variant: 'destructive',
+              title: 'Student Not Found',
+              description: 'The student ID from the QR code does not exist in the system.',
+            });
         }
       } else {
         toast({
@@ -399,8 +398,9 @@ export function AttendanceScannerDialog({
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => {
-        if (!isOpen && activeSession) { // Check if session is active before stopping
-            handleStopSession(); // Ensure session is stopped when dialog is closed
+        // Stop session only if it was active when dialog is closed
+        if (!isOpen && activeSession) {
+            handleStopSession();
         }
         onOpenChange(isOpen);
     }}>
