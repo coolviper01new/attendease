@@ -45,6 +45,8 @@ import { useState, useMemo } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { groupBy } from "lodash";
 import { useToast } from "@/hooks/use-toast";
+import { errorEmitter } from "@/firebase/error-emitter";
+import { FirestorePermissionError } from "@/firebase/errors";
 
 const SessionToggle = ({ subjectId }: { subjectId: string }) => {
   const firestore = useFirestore();
@@ -247,21 +249,31 @@ const DeleteSubjectAction = ({ subject, allSubjects, onDeleted }: { subject: Sub
                 const subjectRef = doc(firestore, 'subjects', id);
                 batch.delete(subjectRef);
             });
-            await batch.commit();
-
-            toast({
-                title: 'Subject Deleted',
-                description: `${subject.name} and all its associated blocks have been deleted.`,
+            
+            // Use .catch() for permission error handling instead of try/catch
+            batch.commit().then(() => {
+                toast({
+                    title: 'Subject Deleted',
+                    description: `${subject.name} and all its associated blocks have been deleted.`,
+                });
+                onDeleted();
+            }).catch((serverError) => {
+                const permissionError = new FirestorePermissionError({
+                    path: `subjects collection`, // Batch delete affects multiple paths
+                    operation: 'delete',
+                });
+                errorEmitter.emit('permission-error', permissionError);
+            }).finally(() => {
+                setIsSubmitting(false);
             });
-            onDeleted();
+
         } catch (error) {
-            console.error("Error deleting subject:", error);
-            toast({
+            console.error("Error checking registrations:", error);
+             toast({
                 variant: 'destructive',
                 title: 'Error',
-                description: 'Could not delete subject. Please try again.',
+                description: 'Could not check for enrollments. Please try again.',
             });
-        } finally {
             setIsSubmitting(false);
         }
     };
