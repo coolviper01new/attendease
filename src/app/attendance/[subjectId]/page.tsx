@@ -15,7 +15,23 @@ async function getSubject(subjectId: string): Promise<Subject | null> {
     if (!subjectSnapshot.exists) {
       return null;
     }
-    return { id: subjectSnapshot.id, ...subjectSnapshot.data() } as Subject;
+    const data = subjectSnapshot.data();
+    if (!data) return null;
+
+    return { 
+      id: subjectSnapshot.id,
+      name: data.name,
+      code: data.code,
+      description: data.description,
+      credits: data.credits,
+      hasLab: data.hasLab,
+      lectureSchedules: data.lectureSchedules,
+      labSchedules: data.labSchedules,
+      block: data.block,
+      schoolYear: data.schoolYear,
+      yearLevel: data.yearLevel,
+      enrollmentStatus: data.enrollmentStatus,
+    } as Subject;
   } catch (error) {
     console.error("Error fetching subject in server component:", error);
     return null;
