@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
@@ -462,7 +463,7 @@ export function AttendanceScannerDialog({
                 </div>
               )}
                {scannedStudentInfo && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 text-white p-4">
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 text-white p-4 text-center">
                     <CheckCircle className="h-16 w-16 text-green-400 mb-4" />
                     <Avatar className="h-24 w-24 mb-4 ring-4 ring-green-400">
                         <AvatarImage src={scannedStudentInfo.avatarUrl} />
@@ -470,7 +471,9 @@ export function AttendanceScannerDialog({
                             {scannedStudentInfo.name.split(' ').map(n => n[0]).join('')}
                         </AvatarFallback>
                     </Avatar>
-                    <h3 className="text-2xl font-bold">Attendance of {scannedStudentInfo.name} is successfully recorded</h3>
+                    <p className="text-xl">Attendance of</p>
+                    <h3 className="text-3xl font-bold my-2">{scannedStudentInfo.name}</h3>
+                    <p className="text-xl">is Recorded</p>
                 </div>
               )}
               {isProcessing && !scannedStudentInfo && (
@@ -563,3 +566,5 @@ export function AttendanceScannerDialog({
     </Dialog>
   );
 }
+
+    
