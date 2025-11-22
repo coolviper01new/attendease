@@ -2,7 +2,7 @@
 'use client';
 import { StatCard } from "@/components/stat-card";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { useCollection, useFirestore } from "@/firebase";
+import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
 import { Users, BookCheck, TrendingUp, TrendingDown, Book, UserCheck } from "lucide-react";
 import Image from "next/image";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis, Legend, Line, LineChart } from "recharts";
@@ -11,8 +11,8 @@ import { useMemo } from "react";
 
 export default function AdminDashboardPage() {
     const firestore = useFirestore();
-    const { data: students, isLoading: studentsLoading } = useCollection(useMemo(() => collection(firestore, 'users'), [firestore]));
-    const { data: subjects, isLoading: subjectsLoading } = useCollection(useMemo(() => collection(firestore, 'subjects'), [firestore]));
+    const { data: students, isLoading: studentsLoading } = useCollection(useMemoFirebase(() => collection(firestore, 'users'), [firestore]));
+    const { data: subjects, isLoading: subjectsLoading } = useCollection(useMemoFirebase(() => collection(firestore, 'subjects'), [firestore]));
     
     const totalStudents = students?.length ?? 0;
     const totalSubjects = subjects?.length ?? 0;
@@ -154,5 +154,3 @@ export default function AdminDashboardPage() {
         </>
     );
 }
-
-    
