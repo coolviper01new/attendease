@@ -24,10 +24,11 @@ import { collection, addDoc, serverTimestamp, query, where, doc } from 'firebase
 import type { Subject, Registration } from '@/lib/types';
 import { groupBy } from 'lodash';
 import { Skeleton } from '@/components/ui/skeleton';
-import { BookOpen, Clock, AlertTriangle } from 'lucide-react';
+import { BookOpen, Clock, AlertTriangle, QrCode } from 'lucide-react';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { useRouter } from 'next/navigation';
 
 function SubjectEnrollmentCard({ 
     subjectCode, 
@@ -156,6 +157,7 @@ function SubjectEnrollmentCard({
 export default function EnrollmentPage() {
   const { user, isUserLoading } = useUser();
   const firestore = useFirestore();
+  const router = useRouter();
   const [alert, setAlert] = useState<{status: 'success' | 'error', title: string, description?: string} | null>(null);
 
   const subjectsQuery = useMemoFirebase(() => query(collection(firestore, 'subjects'), where('enrollmentStatus', '==', 'open')), [firestore]);
@@ -187,8 +189,12 @@ export default function EnrollmentPage() {
     <>
       <PageHeader
         title="Subject Enrollment"
-        description="Browse available subjects for the current semester and enroll."
-      />
+        description="Browse available subjects or scan a QR code to enroll."
+      >
+        <Button onClick={() => router.push('/student/enrollment/scan')}>
+          <QrCode className="mr-2 h-4 w-4" /> Scan Subject QR
+        </Button>
+      </PageHeader>
       
       {alert && (
         <Alert variant={alert.status === 'error' ? 'destructive' : 'default'} className="mb-6">

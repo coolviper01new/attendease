@@ -71,13 +71,6 @@ function StudentHeader() {
             >
               <Link href="/student/enrollment">Enrollment</Link>
             </Button>
-            <Button
-              variant="ghost"
-              asChild
-              className="text-sm font-medium text-muted-foreground transition-colors hover:text-primary"
-            >
-              <Link href="/student/attendance">Scan Enrollment QR</Link>
-            </Button>
           </nav>
           {isLoading ? (
              <Skeleton className="h-10 w-10 rounded-full" />
