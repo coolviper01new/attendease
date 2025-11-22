@@ -24,7 +24,7 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { useFirestore } from '@/firebase';
-import { addDoc, collection, doc, setDoc } from 'firebase/firestore';
+import { addDoc, collection, doc, setDoc, writeBatch } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Copy } from 'lucide-react';
@@ -45,7 +45,7 @@ const subjectSchema = z.object({
   description: z.string().optional(),
   schoolYear: z.string().regex(schoolYearRegex, { message: 'Invalid format. Use YYYY-YYYY.' }),
   yearLevel: z.string({ required_error: 'Please select a year level.' }),
-  block: z.string().min(1, { message: 'Block name is required.' }),
+  blockCount: z.coerce.number().min(1, { message: 'At least one block is required.' }),
   schedules: z.array(scheduleSchema).min(1, { message: 'At least one schedule is required.' })
 });
 
@@ -71,6 +71,7 @@ export function AddSubjectForm({ onSuccess, subject }: AddSubjectFormProps) {
         ...subject,
         schoolYear: subject.schoolYear,
         yearLevel: subject.yearLevel,
+        blockCount: 1, // In edit mode, we only edit one block at a time.
     } : {
       schedules: [],
       schoolYear: '',
@@ -78,16 +79,20 @@ export function AddSubjectForm({ onSuccess, subject }: AddSubjectFormProps) {
       name: '',
       code: '',
       description: '',
-      block: '',
+      blockCount: 1,
     },
   });
   
   useEffect(() => {
-    if (isEditMode) {
+    if (isEditMode && subject) {
       form.reset({
-        ...subject,
+        name: subject.name,
+        code: subject.code,
+        description: subject.description || '',
         schoolYear: subject.schoolYear,
         yearLevel: subject.yearLevel,
+        schedules: subject.schedules,
+        blockCount: 1,
       });
     } else {
         form.reset({
@@ -97,7 +102,7 @@ export function AddSubjectForm({ onSuccess, subject }: AddSubjectFormProps) {
             name: '',
             code: '',
             description: '',
-            block: '',
+            blockCount: 1,
         })
     }
   }, [subject, form, isEditMode]);
@@ -122,7 +127,6 @@ export function AddSubjectForm({ onSuccess, subject }: AddSubjectFormProps) {
     const currentDayOrder = daysOfWeek.indexOf(currentDay);
     
     let sourceIndex = -1;
-    // Find the index of the previous checked day by iterating backwards
     for (let i = currentDayOrder - 1; i >= 0; i--) {
         const prevDay = daysOfWeek[i];
         const foundIndex = fields.findIndex(field => field.day === prevDay);
@@ -146,9 +150,7 @@ export function AddSubjectForm({ onSuccess, subject }: AddSubjectFormProps) {
   
     const { startTime, endTime, room } = sourceSchedule;
   
-    // Use `update` from useFieldArray to set values for a specific index
     update(targetIndex, { ...fields[targetIndex], startTime, endTime, room });
-
 
     toast({
       title: 'Schedule Copied',
@@ -161,25 +163,37 @@ export function AddSubjectForm({ onSuccess, subject }: AddSubjectFormProps) {
     try {
       if (isEditMode && subject?.id) {
         const subjectRef = doc(firestore, 'subjects', subject.id);
-        await setDoc(subjectRef, values, { merge: true });
+        const { blockCount, ...updateData } = values;
+        // In edit mode, we assume the block name is derived from the subject code if it follows the pattern.
+        const blockName = subject.block.startsWith(subject.code) ? subject.block : `${values.code}-B1`;
+        await setDoc(subjectRef, { ...updateData, block: blockName }, { merge: true });
         toast({
           title: 'Subject Updated',
-          description: `${values.name} has been updated successfully.`,
+          description: `${values.name} (${blockName}) has been updated successfully.`,
         });
       } else {
-        await addDoc(collection(firestore, 'subjects'), values);
+        const batch = writeBatch(firestore);
+        const { blockCount, ...subjectData } = values;
+
+        for (let i = 1; i <= blockCount; i++) {
+          const newDocRef = doc(collection(firestore, 'subjects'));
+          const blockName = `${values.code}-B${i}`;
+          batch.set(newDocRef, { ...subjectData, block: blockName });
+        }
+
+        await batch.commit();
         toast({
-          title: 'Subject Created',
-          description: `${values.name} has been added successfully.`,
+          title: 'Subjects Created',
+          description: `${blockCount} block(s) for ${values.name} have been created successfully.`,
         });
       }
       onSuccess();
     } catch (error) {
-      console.error('Error saving subject:', error);
+      console.error('Error saving subject(s):', error);
       toast({
         variant: 'destructive',
         title: 'Error',
-        description: `Failed to ${isEditMode ? 'update' : 'create'} subject. Please try again.`,
+        description: `Failed to ${isEditMode ? 'update' : 'create'} subject(s). Please try again.`,
       });
     } finally {
       setIsSubmitting(false);
@@ -268,15 +282,18 @@ export function AddSubjectForm({ onSuccess, subject }: AddSubjectFormProps) {
         </div>
          <FormField
             control={form.control}
-            name="block"
+            name="blockCount"
             render={({ field }) => (
                 <FormItem>
-                <FormLabel>Block</FormLabel>
+                <FormLabel>Number of Blocks</FormLabel>
                  <FormControl>
-                  <Input placeholder="e.g., BSIT-3A" {...field} />
+                  <Input type="number" min="1" {...field} disabled={isEditMode} />
                 </FormControl>
                 <FormDescription>
-                    Enter the block or section name for this subject.
+                    {isEditMode 
+                        ? "Editing affects only this specific block. To change the number of blocks, create a new subject."
+                        : "Enter the number of blocks for this subject. The system will create separate entries like IT101-B1, IT101-B2, etc."
+                    }
                 </FormDescription>
                 <FormMessage />
                 </FormItem>
@@ -367,7 +384,7 @@ export function AddSubjectForm({ onSuccess, subject }: AddSubjectFormProps) {
         </div>
 
         <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? (isEditMode ? 'Updating...' : 'Creating...') : (isEditMode ? 'Update Subject' : 'Create Subject')}
+          {isSubmitting ? (isEditMode ? 'Updating...' : 'Creating...') : (isEditMode ? 'Update Subject' : 'Create Subjects')}
         </Button>
       </form>
     </Form>

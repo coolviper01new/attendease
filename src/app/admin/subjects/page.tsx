@@ -29,9 +29,6 @@ export default function AdminSubjectsPage() {
   const subjectsQuery = useMemoFirebase(() => collection(firestore, 'subjects'), [firestore]);
   const { data: subjects, isLoading, forceRefresh } = useCollection<Subject>(subjectsQuery);
 
-  const { data: schoolYears, isLoading: schoolYearsLoading } = useCollection<SchoolYear>(useMemoFirebase(() => collection(firestore, 'schoolYears'), [firestore]));
-  const { data: yearLevels, isLoading: yearLevelsLoading } = useCollection<YearLevel>(useMemoFirebase(() => collection(firestore, 'yearLevels'), [firestore]));
-
   const handleAddNew = () => {
     setEditingSubject(null);
     setIsDialogOpen(true);
@@ -44,21 +41,20 @@ export default function AdminSubjectsPage() {
 
   const handleSuccess = () => {
     setIsDialogOpen(false);
+    setEditingSubject(null);
     forceRefresh();
   }
   
   const combinedSubjects = useMemo(() => {
-    if (isLoading || schoolYearsLoading || yearLevelsLoading) return [];
+    if (isLoading) return [];
     return subjects?.map(subject => {
-        const schoolYear = schoolYears?.find(sy => sy.id === subject.schoolYearId);
-        const yearLevel = yearLevels?.find(yl => yl.id === subject.yearLevelId);
         return {
             ...subject,
-            schoolYearName: schoolYear?.name || 'N/A',
-            yearLevelName: yearLevel?.name || 'N/A'
+            schoolYearName: subject.schoolYear || 'N/A',
+            yearLevelName: subject.yearLevel ? `${subject.yearLevel} Year` : 'N/A'
         }
     }) ?? [];
-  }, [subjects, schoolYears, yearLevels, isLoading, schoolYearsLoading, yearLevelsLoading]);
+  }, [subjects, isLoading]);
 
   return (
     <>
@@ -71,12 +67,17 @@ export default function AdminSubjectsPage() {
         </Button>
       </PageHeader>
 
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+      <Dialog open={isDialogOpen} onOpenChange={(isOpen) => {
+          if (!isOpen) {
+            setEditingSubject(null);
+          }
+          setIsDialogOpen(isOpen);
+      }}>
           <DialogContent className="sm:max-w-xl">
             <DialogHeader>
-              <DialogTitle>{editingSubject ? 'Edit Subject' : 'Create New Subject'}</DialogTitle>
+              <DialogTitle>{editingSubject ? 'Edit Subject' : 'Create New Subject(s)'}</DialogTitle>
               <DialogDescription>
-                {editingSubject ? 'Update the details for this subject.' : 'Fill out the form below to add a new subject to the system.'}
+                {editingSubject ? 'Update the details for this subject block.' : 'Fill out the form below to add a new subject to the system.'}
               </DialogDescription>
             </DialogHeader>
             <AddSubjectForm 
