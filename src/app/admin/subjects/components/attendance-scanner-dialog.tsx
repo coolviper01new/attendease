@@ -28,7 +28,7 @@ import {
 } from 'lucide-react';
 import QrScanner from 'qr-scanner';
 import { useToast } from '@/hooks/use-toast';
-import { useCollection, useFirestore, useUser, useMemoFirebase } from '@/firebase';
+import { useCollection, useFirestore, useUser, useMemoFirebase, useDoc } from '@/firebase';
 import {
   doc,
   collection,
@@ -278,8 +278,7 @@ export function AttendanceScannerDialog({
       !scannedData ||
       isProcessing ||
       !activeSession ||
-      !adminUser ||
-      !sessionAttendanceQuery
+      !adminUser
     )
       return;
 
@@ -309,9 +308,14 @@ export function AttendanceScannerDialog({
       if (result.isValid) {
         const studentDoc = await getDoc(doc(firestore, 'users', qrData.studentId));
         const studentData = studentDoc.data() as Student | undefined;
-
+        
+        // This is a collection group query which can be expensive.
+        // Let's assume for now that admins have broader permissions.
+        // A more scalable solution might involve a different data structure
+        // or cloud function for validation if rules become too complex.
+        
         // Use setDoc with studentId as the document ID for idempotent writes
-        const attendanceDocRef = doc(firestore, sessionAttendanceQuery.path, qrData.studentId);
+        const attendanceDocRef = doc(firestore, `subjects/${subject.id}/attendanceSessions/${activeSession.id}/attendance`, qrData.studentId);
         await setDoc(attendanceDocRef, {
           studentId: qrData.studentId,
           subjectId: subject.id,
@@ -364,8 +368,7 @@ export function AttendanceScannerDialog({
     firestore,
     subject.id,
     toast,
-    presentStudents,
-    sessionAttendanceQuery,
+    presentStudents
   ]);
 
   useEffect(() => {
@@ -493,7 +496,7 @@ export function AttendanceScannerDialog({
                     >
                         <StopCircle className="mr-2 h-4 w-4" /> Stop Session
                     </Button>
-                     <Button variant="outline" className="w-full" disabled>
+                     <Button variant="outline" className="w-full text-lg font-bold" disabled>
                         <Clock className="mr-2 h-4 w-4 animate-pulse" />
                         {timeRemaining !== null ? formatTime(timeRemaining) : '00:00'}
                     </Button>
