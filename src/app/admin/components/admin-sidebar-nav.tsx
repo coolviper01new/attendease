@@ -8,13 +8,14 @@ import {
   SidebarGroup,
   SidebarGroupLabel
 } from "@/components/ui/sidebar";
-import { LayoutDashboard, Book, BarChart3, Users } from "lucide-react";
+import { LayoutDashboard, Book, BarChart3, Users, UserPlus } from "lucide-react";
 
 const links = [
   { href: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/admin/subjects", label: "Subjects", icon: Book },
   { href: "/admin/reports", label: "Reports", icon: BarChart3 },
   { href: "/admin/students", label: "Students", icon: Users },
+  { href: "/admin/faculty", label: "Faculty", icon: UserPlus },
 ];
 
 export function AdminSidebarNav() {
