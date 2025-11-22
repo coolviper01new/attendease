@@ -1,6 +1,7 @@
+
 'use client';
 import Link from 'next/link';
-import { useMemo } from 'react';
+import { useMemo, useEffect } from 'react';
 import { AppWindow, User, LogOut, BookUser } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
