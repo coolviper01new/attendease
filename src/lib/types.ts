@@ -27,18 +27,24 @@ export type Block = {
   yearLevelId: string;
 };
 
+export type Schedule = {
+  day: string;
+  startTime: string;
+  endTime: string;
+  room: string;
+};
+
 export type Subject = {
   id: string;
   name: string;
   code: string;
   description: string;
-  schedule: { day: string; startTime: string; endTime: string; room: string };
-  blockId: string;
-  semesterId: string;
-  schoolYearId: string;
-  yearLevelId: string;
-  schoolYearName?: string;
-  yearLevelName?: string;
+  schedules: Schedule[];
+  block: string;
+  schoolYear: string;
+  yearLevel: string;
+  schoolYearName?: string; // This might be deprecated if we are directly entering school year
+  yearLevelName?: string; // This might be deprecated if we are directly entering year level
 };
 
 export type Registration = {

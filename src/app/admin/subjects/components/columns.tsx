@@ -81,24 +81,27 @@ export const columns: ColumnDef<Subject>[] = [
         <div className="font-medium">{row.original.name}</div>
         <div className="text-xs text-muted-foreground">{row.original.code}</div>
         <div className="text-xs text-muted-foreground truncate max-w-xs">{row.original.description}</div>
-        <div className="text-xs text-muted-foreground mt-1">
-            {row.original.schedule.day}, {row.original.schedule.startTime}-{row.original.schedule.endTime} | Room: {row.original.schedule.room}
+        <div className="text-xs text-muted-foreground mt-1 flex flex-wrap gap-x-2 gap-y-1">
+            {row.original.schedules.map(s => (
+                <span key={s.day}>{s.day} {s.startTime}-{s.endTime} ({s.room})</span>
+            ))}
         </div>
       </div>
     ),
   },
   {
-    accessorKey: "schoolYearName",
+    accessorKey: "schoolYear",
     header: "School Year",
   },
   {
-    accessorKey: "yearLevelName",
+    accessorKey: "yearLevel",
     header: "Year Level",
+    cell: ({ row }) => <span>{row.original.yearLevel}</span>
   },
    {
-    accessorKey: "blockId",
-    header: "Blocks",
-     cell: ({ row }) => <Badge variant="outline">{row.original.blockId ? 1 : 0}</Badge>,
+    accessorKey: "block",
+    header: "Block",
+     cell: ({ row }) => <Badge variant="outline">{row.original.block}</Badge>,
   },
   {
     id: "sessionStatus",

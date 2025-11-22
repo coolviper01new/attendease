@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
@@ -23,25 +23,34 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import { useFirestore } from '@/firebase';
 import { addDoc, collection } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import type { SchoolYear, YearLevel, Block } from '@/lib/types';
+import { Checkbox } from '@/components/ui/checkbox';
+import { X } from 'lucide-react';
+
+const schoolYearRegex = /^\d{4}-\d{4}$/;
+
+const scheduleSchema = z.object({
+  day: z.string(),
+  startTime: z.string().min(1, { message: 'Required' }),
+  endTime: z.string().min(1, { message: 'Required' }),
+  room: z.string().min(1, { message: 'Required' }),
+});
 
 const subjectSchema = z.object({
   name: z.string().min(2, { message: 'Subject name must be at least 2 characters.' }),
   code: z.string().min(2, { message: 'Subject code is required.' }),
   description: z.string().optional(),
-  schoolYearId: z.string({ required_error: 'Please select a school year.' }),
-  yearLevelId: z.string({ required_error: 'Please select a year level.' }),
-  blockId: z.string({ required_error: 'Please select a block.' }),
-  scheduleDay: z.string().min(1, {message: 'Day is required.'}),
-  scheduleStartTime: z.string().min(1, {message: 'Start time is required.'}),
-  scheduleEndTime: z.string().min(1, {message: 'End time is required.'}),
-  scheduleRoom: z.string().min(1, {message: 'Room is required.'}),
+  schoolYear: z.string().regex(schoolYearRegex, { message: 'Invalid format. Use YYYY-YYYY.' }),
+  yearLevel: z.string({ required_error: 'Please select a year level.' }),
+  block: z.string().min(1, { message: 'Block name is required.' }),
+  schedules: z.array(scheduleSchema).min(1, { message: 'At least one schedule is required.' })
 });
 
 type SubjectFormValues = z.infer<typeof subjectSchema>;
+
+const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 
 interface AddSubjectFormProps {
   onSuccess: () => void;
@@ -54,23 +63,26 @@ export function AddSubjectForm({ onSuccess }: AddSubjectFormProps) {
 
   const form = useForm<SubjectFormValues>({
     resolver: zodResolver(subjectSchema),
+    defaultValues: {
+      schedules: [],
+    },
   });
 
-  const { data: schoolYears, isLoading: schoolYearsLoading } = useCollection<SchoolYear>(
-    useMemoFirebase(() => collection(firestore, 'schoolYears'), [firestore])
-  );
-  const { data: yearLevels, isLoading: yearLevelsLoading } = useCollection<YearLevel>(
-    useMemoFirebase(() => collection(firestore, 'yearLevels'), [firestore])
-  );
-  
-  const selectedYearLevelId = form.watch('yearLevelId');
+  const { fields, append, remove } = useFieldArray({
+    control: form.control,
+    name: 'schedules',
+  });
 
-  const blocksQuery = useMemoFirebase(() => {
-    if (!selectedYearLevelId) return null;
-    return collection(firestore, 'yearLevels', selectedYearLevelId, 'blocks');
-  }, [firestore, selectedYearLevelId]);
-  const { data: blocks, isLoading: blocksLoading } = useCollection<Block>(blocksQuery);
-
+  const handleDayCheckedChange = (checked: boolean, day: string) => {
+    if (checked) {
+      append({ day, startTime: '', endTime: '', room: '' });
+    } else {
+      const indexToRemove = fields.findIndex(field => field.day === day);
+      if (indexToRemove > -1) {
+        remove(indexToRemove);
+      }
+    }
+  };
 
   const onSubmit = async (values: SubjectFormValues) => {
     setIsSubmitting(true);
@@ -79,17 +91,10 @@ export function AddSubjectForm({ onSuccess }: AddSubjectFormProps) {
         name: values.name,
         code: values.code,
         description: values.description,
-        schoolYearId: values.schoolYearId,
-        yearLevelId: values.yearLevelId,
-        blockId: values.blockId,
-        schedule: {
-          day: values.scheduleDay,
-          startTime: values.scheduleStartTime,
-          endTime: values.scheduleEndTime,
-          room: values.scheduleRoom,
-        },
-        // Hardcoding semesterId for now as it's not in the form
-        semesterId: 'sem01',
+        schoolYear: values.schoolYear,
+        yearLevel: values.yearLevel,
+        block: values.block,
+        schedules: values.schedules,
       });
       toast({
         title: 'Subject Created',
@@ -108,9 +113,7 @@ export function AddSubjectForm({ onSuccess }: AddSubjectFormProps) {
       setIsSubmitting(false);
     }
   };
-
-  const isLoading = schoolYearsLoading || yearLevelsLoading;
-
+  
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
@@ -154,127 +157,135 @@ export function AddSubjectForm({ onSuccess }: AddSubjectFormProps) {
           )}
         />
         <div className="grid grid-cols-2 gap-4">
-             <FormField
-                control={form.control}
-                name="schoolYearId"
-                render={({ field }) => (
-                    <FormItem>
-                    <FormLabel>School Year</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isLoading}>
-                        <FormControl>
-                        <SelectTrigger>
-                            <SelectValue placeholder="Select a school year" />
-                        </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                        {schoolYears?.map((sy) => (
-                            <SelectItem key={sy.id} value={sy.id}>{sy.name}</SelectItem>
-                        ))}
-                        </SelectContent>
-                    </Select>
-                    <FormMessage />
-                    </FormItem>
-                )}
-            />
-            <FormField
-                control={form.control}
-                name="yearLevelId"
-                render={({ field }) => (
-                    <FormItem>
-                    <FormLabel>Year Level</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isLoading}>
-                        <FormControl>
-                        <SelectTrigger>
-                            <SelectValue placeholder="Select a year level" />
-                        </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                        {yearLevels?.map((yl) => (
-                            <SelectItem key={yl.id} value={yl.id}>{yl.name}</SelectItem>
-                        ))}
-                        </SelectContent>
-                    </Select>
-                    <FormMessage />
-                    </FormItem>
-                )}
-            />
-        </div>
-        <FormField
+          <FormField
             control={form.control}
-            name="blockId"
+            name="schoolYear"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>School Year</FormLabel>
+                <FormControl>
+                  <Input placeholder="e.g., 2024-2025" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="yearLevel"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Year Level</FormLabel>
+                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a year level" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="1">1st Year</SelectItem>
+                    <SelectItem value="2">2nd Year</SelectItem>
+                    <SelectItem value="3">3rd Year</SelectItem>
+                    <SelectItem value="4">4th Year</SelectItem>
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+         <FormField
+            control={form.control}
+            name="block"
             render={({ field }) => (
                 <FormItem>
                 <FormLabel>Block</FormLabel>
-                <Select onValueChange={field.onChange} defaultValue={field.value} disabled={!selectedYearLevelId || blocksLoading}>
-                    <FormControl>
-                    <SelectTrigger>
-                        <SelectValue placeholder="Select a year level first" />
-                    </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                    {blocks?.map((b) => (
-                        <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
-                    ))}
-                    </SelectContent>
-                </Select>
+                 <FormControl>
+                  <Input placeholder="e.g., BSIT-3A" {...field} />
+                </FormControl>
+                <FormDescription>
+                    Enter the block or section name for this subject.
+                </FormDescription>
                 <FormMessage />
                 </FormItem>
             )}
         />
+        
         <div>
-            <FormLabel>Schedule</FormLabel>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-2">
-                 <FormField
-                    control={form.control}
-                    name="scheduleDay"
-                    render={({ field }) => (
-                        <FormItem>
+          <FormLabel>Schedule</FormLabel>
+          <FormDescription className="mb-2">Select the days this subject is scheduled and fill in the details.</FormDescription>
+          <div className="space-y-4">
+            {daysOfWeek.map((day) => {
+              const fieldIndex = fields.findIndex(f => f.day === day);
+              const isChecked = fieldIndex > -1;
+              return (
+                <div key={day}>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id={day}
+                      checked={isChecked}
+                      onCheckedChange={(checked) => handleDayCheckedChange(Boolean(checked), day)}
+                    />
+                    <label htmlFor={day} className="text-sm font-medium leading-none">
+                      {day}
+                    </label>
+                  </div>
+                  {isChecked && (
+                    <div className="grid grid-cols-3 gap-2 mt-2 pl-6">
+                      <FormField
+                        control={form.control}
+                        name={`schedules.${fieldIndex}.startTime`}
+                        render={({ field }) => (
+                          <FormItem>
                             <FormControl>
-                                <Input placeholder="Day" {...field} />
+                              <Input type="time" {...field} />
                             </FormControl>
-                             <FormMessage />
-                        </FormItem>
-                    )}
-                 />
-                 <FormField
-                    control={form.control}
-                    name="scheduleStartTime"
-                    render={({ field }) => (
-                        <FormItem>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name={`schedules.${fieldIndex}.endTime`}
+                        render={({ field }) => (
+                          <FormItem>
                             <FormControl>
-                                <Input type="time" placeholder="Start Time" {...field} />
+                              <Input type="time" {...field} />
                             </FormControl>
-                             <FormMessage />
-                        </FormItem>
-                    )}
-                 />
-                 <FormField
-                    control={form.control}
-                    name="scheduleEndTime"
-                    render={({ field }) => (
-                        <FormItem>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name={`schedules.${fieldIndex}.room`}
+                        render={({ field }) => (
+                          <FormItem>
                             <FormControl>
-                                <Input type="time" placeholder="End Time" {...field} />
+                              <Input placeholder="Room" {...field} />
                             </FormControl>
-                             <FormMessage />
-                        </FormItem>
-                    )}
-                 />
-                 <FormField
-                    control={form.control}
-                    name="scheduleRoom"
-                    render={({ field }) => (
-                        <FormItem>
-                            <FormControl>
-                                <Input placeholder="Room" {...field} />
-                            </FormControl>
-                             <FormMessage />
-                        </FormItem>
-                    )}
-                 />
-            </div>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+             <FormField
+                control={form.control}
+                name="schedules"
+                render={() => (
+                    <FormItem>
+                        <FormMessage />
+                    </FormItem>
+                )}
+            />
+          </div>
         </div>
-        <Button type="submit" disabled={isSubmitting || isLoading}>
+
+        <Button type="submit" disabled={isSubmitting}>
           {isSubmitting ? 'Creating...' : 'Create Subject'}
         </Button>
       </form>

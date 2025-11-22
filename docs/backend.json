@@ -157,34 +157,41 @@
           "type": "string",
           "description": "Description of the subject."
         },
-        "schedule": {
-          "type": "object",
-          "properties": {
-            "day": { "type": "string" },
-            "startTime": { "type": "string" },
-            "endTime": { "type": "string" },
-            "room": { "type": "string" }
-          },
-          "required": ["day", "startTime", "endTime", "room"],
-          "description": "Schedule details (day, time, room)."
+        "schedules": {
+          "type": "array",
+          "description": "An array of schedule objects for the subject.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "day": { "type": "string" },
+              "startTime": { "type": "string" },
+              "endTime": { "type": "string" },
+              "room": { "type": "string" }
+            },
+            "required": ["day", "startTime", "endTime", "room"]
+          }
         },
-        "schoolYearId": {
+        "schoolYear": {
           "type": "string",
-          "description": "Reference to the SchoolYear."
+          "description": "The school year for the subject (e.g., 2024-2025)."
         },
-        "yearLevelId": {
+        "yearLevel": {
           "type": "string",
-          "description": "Reference to the YearLevel."
+          "description": "The year level for the subject (e.g., 1, 2, 3, 4)."
+        },
+        "block": {
+          "type": "string",
+          "description": "The block or section for this subject instance."
         }
       },
       "required": [
         "id",
         "name",
         "code",
-        "description",
-        "schedule",
-        "schoolYearId",
-        "yearLevelId"
+        "schedules",
+        "schoolYear",
+        "yearLevel",
+        "block"
       ]
     },
     "Registration": {
