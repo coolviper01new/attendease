@@ -9,14 +9,13 @@ import { SubjectClient } from "./components/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
 import { collection, doc, getDocs, query } from 'firebase/firestore';
-import type { Subject, SchoolYear, YearLevel } from "@/lib/types";
+import type { Subject } from "@/lib/types";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import { AddSubjectForm } from "./components/add-subject-form";
 
@@ -47,13 +46,7 @@ export default function AdminSubjectsPage() {
   
   const combinedSubjects = useMemo(() => {
     if (isLoading) return [];
-    return subjects?.map(subject => {
-        return {
-            ...subject,
-            schoolYearName: subject.schoolYear || 'N/A',
-            yearLevelName: subject.yearLevel ? `${subject.yearLevel} Year` : 'N/A'
-        }
-    }) ?? [];
+    return subjects ?? [];
   }, [subjects, isLoading]);
 
   return (
