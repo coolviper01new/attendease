@@ -2,7 +2,7 @@
 'use client';
 import Link from 'next/link';
 import { useMemo, useEffect } from 'react';
-import { AppWindow, User, LogOut, BookUser, CheckSquare } from 'lucide-react';
+import { AppWindow, User, LogOut, BookUser, CheckSquare, QrCode } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import {
@@ -70,6 +70,13 @@ function StudentHeader() {
               className="text-sm font-medium text-muted-foreground transition-colors hover:text-primary"
             >
               <Link href="/student/enrollment">Enrollment</Link>
+            </Button>
+            <Button
+              variant="ghost"
+              asChild
+              className="text-sm font-medium text-muted-foreground transition-colors hover:text-primary"
+            >
+              <Link href="/student/attendance">Scan Enrollment QR</Link>
             </Button>
           </nav>
           {isLoading ? (
@@ -148,5 +155,3 @@ export default function StudentLayout({
     </div>
   );
 }
-
-    
