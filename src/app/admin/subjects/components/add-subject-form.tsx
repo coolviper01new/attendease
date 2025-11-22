@@ -94,18 +94,26 @@ export function AddSubjectForm({ onSuccess }: AddSubjectFormProps) {
       return;
     }
   
-    const sourceSchedule = form.getValues(`schedules.${targetIndex - 1}`);
+    const sourceIndex = fields.findIndex(field => field.day === daysOfWeek[daysOfWeek.indexOf(fields[targetIndex].day) - 1]);
+    
+    if (sourceIndex === -1) {
+       toast({
+        variant: 'destructive',
+        title: 'Cannot Copy',
+        description: 'Previous day is not checked.',
+      });
+      return;
+    }
+
+    const sourceSchedule = form.getValues(`schedules.${sourceIndex}`);
     if (!sourceSchedule) return;
   
     const { startTime, endTime, room } = sourceSchedule;
   
-    update(targetIndex, {
-      ...fields[targetIndex],
-      startTime,
-      endTime,
-      room,
-    });
-  
+    form.setValue(`schedules.${targetIndex}.startTime`, startTime);
+    form.setValue(`schedules.${targetIndex}.endTime`, endTime);
+    form.setValue(`schedules.${targetIndex}.room`, room);
+
     toast({
       title: 'Schedule Copied',
       description: `Schedule from ${sourceSchedule.day} has been copied.`,
