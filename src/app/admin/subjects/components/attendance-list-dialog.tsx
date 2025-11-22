@@ -78,24 +78,14 @@ export function AttendanceListDialog({
         try {
             // 3. Get all students registered for this subject
             const registrationsQuery = query(collectionGroup(firestore, 'registrations'), where('subjectId', '==', subject.id));
-            const registrationsSnapshot = await getDocs(registrationsQuery).catch(e => {
-                const error = e as any;
-                if (error?.code === 'permission-denied') {
-                    const permissionError = new FirestorePermissionError({
-                        path: 'registrations', // path for collection group query
-                        operation: 'list'
-                    });
-                    errorEmitter.emit('permission-error', permissionError);
-                }
-                throw e; // re-throw to stop execution
-            });
+            const registrationsSnapshot = await getDocs(registrationsQuery);
             
             const studentIds = registrationsSnapshot.docs.map(doc => (doc.data() as Registration).studentId);
 
             if (studentIds.length > 0) {
                  const studentChunks: string[][] = [];
-                for (let i = 0; i < studentIds.length; i += 10) {
-                    studentChunks.push(studentIds.slice(i, i + 10));
+                for (let i = 0; i < studentIds.length; i += 30) { // Firestore 'in' query limit is 30
+                    studentChunks.push(studentIds.slice(i, i + 30));
                 }
 
                 const studentPromises = studentChunks.map(chunk => 
@@ -134,7 +124,13 @@ export function AttendanceListDialog({
             }
         } catch(e) {
             const error = e as any;
-            if (error?.code !== 'permission-denied') { // only log if not already handled
+             if (error?.code === 'permission-denied') {
+                const permissionError = new FirestorePermissionError({
+                    path: 'registrations', // path for collection group query
+                    operation: 'list'
+                });
+                errorEmitter.emit('permission-error', permissionError);
+            } else if (error?.name !== 'AbortError') {
                  console.error("An unexpected error occurred in AttendanceListDialog:", error);
             }
         } finally {

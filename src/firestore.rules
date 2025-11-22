@@ -93,9 +93,9 @@ service cloud.firestore {
         allow list: if isSignedIn() && request.query.where.studentId == request.auth.uid
                     || (isAdmin() && request.query.where.subjectId is string && request.query.where.date is string);
     }
-
+    
     match /{path=**}/registrations/{registrationId} {
-        allow list: if isAdmin() && request.query.where.subjectId is string;
+      allow list: if isSignedIn() && request.query.where.subjectId is string && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
 
