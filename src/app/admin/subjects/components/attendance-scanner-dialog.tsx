@@ -40,6 +40,7 @@ import {
   serverTimestamp,
   getDoc,
   setDoc,
+  collectionGroup,
 } from 'firebase/firestore';
 import { validateAttendance } from '@/ai/flows/attendance-validator';
 import type {
@@ -48,6 +49,8 @@ import type {
   Attendance,
   Student,
 } from '@/lib/types';
+import { FirestorePermissionError } from '@/firebase/errors';
+import { errorEmitter } from '@/firebase/error-emitter';
 
 interface AttendanceScannerDialogProps {
   subject: Subject;
@@ -294,12 +297,13 @@ export function AttendanceScannerDialog({
         return;
       }
       
+      // Removed the redundant registration check. The AI will validate the secret.
       const validationInput = {
         qrCodeData: scannedData,
         qrCodeSecret: activeSession.qrCodeSecret,
         attendanceSessionActive: activeSession.isActive,
       };
-
+      
       const result = await validateAttendance(validationInput);
 
       if (result.isValid) {
@@ -321,6 +325,10 @@ export function AttendanceScannerDialog({
             setScannedStudentInfo({
                 name: `${studentData.firstName} ${studentData.lastName}`,
                 avatarUrl: studentData.avatarUrl
+            });
+             toast({
+                title: 'Attendance Marked!',
+                description: `${studentData.firstName} ${studentData.lastName} marked as present.`,
             });
         }
         // No toast needed here anymore, as the overlay provides feedback
@@ -407,11 +415,15 @@ export function AttendanceScannerDialog({
         onOpenChange(isOpen);
     }}>
       <DialogContent className="max-w-6xl h-[90vh]">
-        <DialogHeader>
-          <DialogTitle>Attendance Scanner: {subject.name}</DialogTitle>
-          <DialogDescription>
-            {subject.code} ({subject.block})
-          </DialogDescription>
+        <DialogHeader className="text-center">
+          <DialogTitle className="text-3xl font-bold font-headline">Attendance Scanner</DialogTitle>
+          <DialogDescription className="text-lg text-muted-foreground">{subject.name} ({subject.code})</DialogDescription>
+           <Alert className="mt-4 bg-primary/5 border-primary/20">
+              <AlertTitle className="font-semibold text-primary">Welcome Student!</AlertTitle>
+              <AlertDescription className="text-foreground/80">
+                Please show your Subject QR Code Generated at least 1 foot to the device camera. Thank you
+              </AlertDescription>
+            </Alert>
         </DialogHeader>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start h-full overflow-hidden">
           {/* Left Column: Scanner and Controls */}
@@ -455,8 +467,7 @@ export function AttendanceScannerDialog({
                             {scannedStudentInfo.name.split(' ').map(n => n[0]).join('')}
                         </AvatarFallback>
                     </Avatar>
-                    <h3 className="text-2xl font-bold">{scannedStudentInfo.name}</h3>
-                    <p className="text-lg text-green-300">Attendance successfully recorded.</p>
+                    <h3 className="text-2xl font-bold">Attendance of {scannedStudentInfo.name} is successfully recorded</h3>
                 </div>
               )}
               {isProcessing && !scannedStudentInfo && (
@@ -490,12 +501,9 @@ export function AttendanceScannerDialog({
                 )}
             </div>
              <Card className="flex-shrink-0">
-                <CardHeader className="pb-4 flex flex-row items-center gap-4">
-                    <Clock className="h-8 w-8 text-muted-foreground" />
-                    <div>
-                        <p className="text-2xl font-bold">{currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
-                        <p className="text-sm text-muted-foreground">{currentTime.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</p>
-                    </div>
+                <CardHeader className="pb-4 text-center">
+                  <p className="text-2xl font-bold">{currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                  <p className="text-2xl font-bold">{currentTime.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</p>
                 </CardHeader>
             </Card>
           </div>
