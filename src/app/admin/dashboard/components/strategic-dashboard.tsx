@@ -30,7 +30,7 @@ export function StrategicDashboard({ data, isLoading }: DashboardProps) {
     }, [data]);
     
      const attendanceByYearLevel = useMemo(() => {
-        if (!data || !data.registrations.length) return [];
+        if (!data || !data.registrations || data.registrations.length === 0) return [];
         
         const yearLevels = ['1', '2', '3', '4'];
         

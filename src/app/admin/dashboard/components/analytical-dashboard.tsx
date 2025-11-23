@@ -57,7 +57,7 @@ export function AnalyticalDashboard({ data, isLoading }: DashboardProps) {
     }, [data]);
     
      const subjectPerformanceData = useMemo(() => {
-        if (!data || !data.registrations.length) return [];
+        if (!data || !data.registrations || data.registrations.length === 0) return [];
         
         return data.subjects.map(subject => {
             const subjectRegistrations = data.registrations.filter(r => r.subjectId === subject.id);
@@ -143,7 +143,7 @@ export function AnalyticalDashboard({ data, isLoading }: DashboardProps) {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {subjectPerformanceData.length > 0 ? subjectPerformanceData.map(item => (
+                            {subjectPerformanceData && subjectPerformanceData.length > 0 ? subjectPerformanceData.map(item => (
                                 <TableRow key={item.name}>
                                     <TableCell>{item.name}</TableCell>
                                     <TableCell className="text-right">
