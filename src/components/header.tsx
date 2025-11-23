@@ -33,8 +33,7 @@ export function Header() {
   const isLoading = isUserLoading || isAdminLoading;
 
   return (
-    <header className="sticky top-0 z-30 w-full border-b border-border/70 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="flex h-16 items-center px-4 sm:px-6">
+    <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background/95 px-6 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="mr-4 hidden md:flex">
             <SidebarTrigger />
         </div>
@@ -77,7 +76,6 @@ export function Header() {
             ) : null}
           </nav>
         </div>
-      </div>
     </header>
   );
 }

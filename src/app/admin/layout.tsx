@@ -41,7 +41,7 @@ export default function AdminLayout({
         </Link>
         <SidebarTrigger />
       </div>
-      <div className="flex">
+      <div className="flex min-h-screen">
         <Sidebar collapsible="icon" className="hidden md:flex w-64 flex-col">
             <SidebarHeader className="p-4">
                  <Link href="/" className="flex items-center gap-2 font-bold text-xl text-sidebar-foreground font-headline">
@@ -65,9 +65,9 @@ export default function AdminLayout({
                 </Button>
             </SidebarFooter>
         </Sidebar>
-        <div className="flex-1 bg-background">
+        <div className="flex-1 flex flex-col bg-background">
             <Header />
-            <main className="p-6">
+            <main className="flex-1 p-6">
                 {children}
             </main>
         </div>
