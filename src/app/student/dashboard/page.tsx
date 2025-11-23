@@ -24,7 +24,7 @@ import {
 } from '@/components/ui/dialog';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useUser, useFirestore, useDoc, useCollection, useMemoFirebase } from '@/firebase';
-import { doc, collection, query, where, getDocs, updateDoc, getDoc } from 'firebase/firestore';
+import { doc, collection, query, where, getDocs, updateDoc, getDoc, onSnapshot } from 'firebase/firestore';
 import type { Student, Subject, Registration, Schedule, AttendanceSession, Attendance } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
