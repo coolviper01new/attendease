@@ -155,23 +155,30 @@ export function AttendanceScannerDialog({
       'attendanceSessions',
       activeSession.id
     );
+    const subjectRef = doc(firestore, 'subjects', subject.id);
 
-    const sessionData = { isActive: false, endTime: serverTimestamp() };
-    updateDoc(sessionRef, sessionData).catch(error => {
+    const sessionUpdate = { isActive: false, endTime: serverTimestamp() };
+    const subjectUpdate = { isSessionActive: false, activeSessionId: null, activeSessionSecret: null };
+
+    try {
+      await updateDoc(sessionRef, sessionUpdate);
+      await updateDoc(subjectRef, subjectUpdate);
+      setAlertInfo({ title: 'Attendance Session Stopped', description: '', variant: 'default'});
+      if(intervalRef.current) clearInterval(intervalRef.current);
+      setTimeRemaining(null);
+      onRefresh(); // Notify parent component to refresh data
+    } catch(error) {
         errorEmitter.emit(
             'permission-error',
             new FirestorePermissionError({
                 path: sessionRef.path,
                 operation: 'update',
-                requestResourceData: sessionData
+                requestResourceData: sessionUpdate
             })
-        )
-    });
-
-    setAlertInfo({ title: 'Attendance Session Stopped', description: '', variant: 'default'});
-    if(intervalRef.current) clearInterval(intervalRef.current);
-    setTimeRemaining(null);
-  }, [activeSession, firestore, subject.id]);
+        );
+        // Also emit for subject update failure if needed
+    }
+  }, [activeSession, firestore, subject.id, onRefresh]);
 
 
   // Countdown timer effect
@@ -396,30 +403,39 @@ export function AttendanceScannerDialog({
       subject.id,
       'attendanceSessions'
     );
+    const subjectRef = doc(firestore, 'subjects', subject.id);
+
     const sessionData = {
       subjectId: subject.id,
       startTime: serverTimestamp(),
       isActive: true,
       qrCodeSecret: newSessionSecret,
     };
-    addDoc(sessionCollectionRef, sessionData).catch(error => {
-        errorEmitter.emit(
-            'permission-error',
-            new FirestorePermissionError({
-                path: sessionCollectionRef.path,
-                operation: 'create',
-                requestResourceData: sessionData
-            })
-        );
-    });
+    try {
+        const newSessionDoc = await addDoc(sessionCollectionRef, sessionData);
+        // Update parent subject
+        await updateDoc(subjectRef, { 
+          isSessionActive: true, 
+          activeSessionId: newSessionDoc.id,
+          activeSessionSecret: newSessionSecret 
+        });
 
-    setTimeRemaining(20 * 60); // Start 20 minute timer
-    setAlertInfo({
-      title: 'Attendance Session Started',
-      description: 'You can now start scanning student QR codes.',
-      variant: 'default',
-    });
-    refreshSessions();
+        setTimeRemaining(20 * 60); // Start 20 minute timer
+        setAlertInfo({
+          title: 'Attendance Session Started',
+          description: 'You can now start scanning student QR codes.',
+          variant: 'default',
+        });
+        refreshSessions();
+        onRefresh();
+
+      } catch (err) {
+         errorEmitter.emit('permission-error', new FirestorePermissionError({
+          path: sessionCollectionRef.path,
+          operation: 'create',
+          requestResourceData: sessionData,
+        }));
+      }
   };
   
   const isSessionActive = !!activeSession;
