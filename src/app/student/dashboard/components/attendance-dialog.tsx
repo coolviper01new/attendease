@@ -43,7 +43,6 @@ export function AttendanceDialog({
   const attendanceQuery = useMemoFirebase(() => {
     if (!student) return null;
     // Query is simplified to only what is allowed by security rules for students.
-    // Filtering by subject will happen on the client side.
     return query(
       collectionGroup(firestore, 'attendance'),
       where('studentId', '==', student.id),

@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -23,7 +24,7 @@ import {
 } from '@/components/ui/dialog';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useUser, useFirestore, useDoc, useCollection, useMemoFirebase } from '@/firebase';
-import { doc, collection, query, where, getDocs, updateDoc, onSnapshot } from 'firebase/firestore';
+import { doc, collection, query, where, getDocs, updateDoc, onSnapshot, serverTimestamp } from 'firebase/firestore';
 import type { Student, Subject, Registration, Schedule, AttendanceSession, Attendance } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
@@ -37,16 +38,12 @@ const QrCodeDialog = ({
   isDeviceRegistered,
   isCurrentDevice,
   onRegister,
-  isOpen,
-  onOpenChange,
 }: {
   studentId: string;
   subject: Subject;
   isDeviceRegistered: boolean;
   isCurrentDevice: boolean;
   onRegister: () => void;
-  isOpen: boolean;
-  onOpenChange: (isOpen: boolean) => void;
 }) => {
   if (!isDeviceRegistered) {
     return (
@@ -86,7 +83,7 @@ const QrCodeDialog = ({
   )}`;
 
   return (
-    <Dialog open={isOpen} onOpenChange={onOpenChange}>
+    <Dialog>
       <DialogTrigger asChild>
         <Button className="w-full">
           <QrCode className="mr-2 h-4 w-4" /> View QR Code
@@ -113,11 +110,12 @@ const QrCodeDialog = ({
 };
 
 
-const SubjectCard = ({ subject, student, isClient, isDeviceRegistered, isCurrentDevice, onRegisterDevice, isToday }: {
-    subject: Subject;
+const SubjectCard = ({ subjectId, student, isClient, isDeviceRegistered, isCurrentDevice, onRegisterDevice, isToday }: {
+    subjectId: string;
     student: Student | null;
     isClient: boolean;
     isDeviceRegistered: boolean;
+
     isCurrentDevice: boolean;
     onRegisterDevice: () => void;
     isToday?: boolean;
@@ -128,10 +126,16 @@ const SubjectCard = ({ subject, student, isClient, isDeviceRegistered, isCurrent
     const [isConfirmed, setIsConfirmed] = useState(false);
     const [countdown, setCountdown] = useState(5);
     
+    const subjectDocRef = useMemoFirebase(() => {
+        if (!subjectId) return null;
+        return doc(firestore, 'subjects', subjectId);
+    }, [firestore, subjectId]);
+    const { data: subject, isLoading: isSubjectLoading } = useDoc<Subject>(subjectDocRef);
+
     const studentAttendanceDocRef = useMemoFirebase(() => {
-        if (!subject.isSessionActive || !student) return null;
+        if (!subject?.isSessionActive || !student || !subject.activeSessionId) return null;
         return doc(firestore, `subjects/${subject.id}/attendanceSessions/${subject.activeSessionId}/attendance`, student.id);
-    }, [firestore, subject.id, subject.isSessionActive, subject.activeSessionId, student]);
+    }, [firestore, subject, student]);
 
     const { data: attendanceRecord } = useDoc<Attendance>(studentAttendanceDocRef);
 
@@ -162,6 +166,17 @@ const SubjectCard = ({ subject, student, isClient, isDeviceRegistered, isCurrent
     }
     
     const today = new Date().toLocaleDateString('en-US', { weekday: 'long' });
+    
+    if (isSubjectLoading) {
+        return (
+            <Card><CardHeader><Skeleton className="h-6 w-3/4" /></CardHeader><CardContent><Skeleton className="h-4 w-1/2" /></CardContent><CardFooter><Skeleton className="h-10 w-full" /></CardFooter></Card>
+        );
+    }
+
+    if (!subject) {
+        return null;
+    }
+
     const todayLecSchedules = getTodaySchedules(subject.lectureSchedules, today);
     const todayLabSchedules = getTodaySchedules(subject.labSchedules, today);
 
@@ -194,8 +209,6 @@ const SubjectCard = ({ subject, student, isClient, isDeviceRegistered, isCurrent
                 isDeviceRegistered={isDeviceRegistered}
                 isCurrentDevice={isCurrentDevice}
                 onRegister={onRegisterDevice}
-                isOpen={isQrDialogOpen}
-                onOpenChange={setIsQrDialogOpen}
             />
         );
     }
@@ -252,8 +265,6 @@ export default function StudentDashboardPage() {
   
   const [currentDeviceId, setCurrentDeviceId] = useState<string | null>(null);
   const [isClient, setIsClient] = useState(false);
-  const [enrolledSubjects, setEnrolledSubjects] = useState<Subject[]>([]);
-  const [areSubjectsLoading, setAreSubjectsLoading] = useState(true);
   const [deviceRegAlert, setDeviceRegAlert] = useState<string | null>(null);
 
   const userDocRef = useMemoFirebase(() => {
@@ -274,52 +285,6 @@ export default function StudentDashboardPage() {
     localStorage.setItem('deviceId', deviceId);
     setCurrentDeviceId(deviceId);
   }, []);
-  
-   useEffect(() => {
-    if (areRegsLoading || !userRegistrations) {
-      setAreSubjectsLoading(true);
-      return;
-    }
-
-    if (userRegistrations.length === 0) {
-      setEnrolledSubjects([]);
-      setAreSubjectsLoading(false);
-      return;
-    }
-
-    const subjectIds = userRegistrations.map(reg => reg.subjectId);
-    if (subjectIds.length === 0) {
-      setEnrolledSubjects([]);
-      setAreSubjectsLoading(false);
-      return;
-    }
-
-    const q = query(collection(firestore, 'subjects'), where('__name__', 'in', subjectIds));
-    const unsubscribe = onSnapshot(q, (querySnapshot) => {
-        setEnrolledSubjects(prevSubjects => {
-            const subjectsMap = new Map(prevSubjects.map(s => [s.id, s]));
-            querySnapshot.docChanges().forEach(change => {
-                const docData = change.doc.data();
-                const subject = { ...docData, id: change.doc.id } as Subject;
-                if (change.type === "removed") {
-                    subjectsMap.delete(subject.id);
-                } else {
-                    subjectsMap.set(subject.id, subject);
-                }
-            });
-            return Array.from(subjectsMap.values());
-        });
-        if (areSubjectsLoading) {
-            setAreSubjectsLoading(false);
-        }
-    }, (error) => {
-        console.error("Error fetching enrolled subjects in real-time", error);
-        setAreSubjectsLoading(false);
-    });
-
-    return () => unsubscribe();
-  }, [userRegistrations, areRegsLoading, firestore, areSubjectsLoading]);
-  
 
   const handleRegisterDevice = async () => {
     if (!userDocRef || !currentDeviceId) return;
@@ -335,18 +300,26 @@ export default function StudentDashboardPage() {
       }))
     })
   };
+  
+  const subjectsQuery = useMemoFirebase(() => {
+      if (!userRegistrations || userRegistrations.length === 0) return null;
+      const subjectIds = userRegistrations.map(reg => reg.subjectId);
+      return query(collection(firestore, 'subjects'), where('__name__', 'in', subjectIds));
+  }, [userRegistrations, firestore]);
+  const { data: enrolledSubjects, isLoading: areSubjectsLoading } = useCollection<Subject>(subjectsQuery);
 
   const isDeviceRegistered = !!student?.deviceId;
   const isCurrentDevice = isDeviceRegistered && student?.deviceId === currentDeviceId;
-  const isLoading = isUserLoading || isStudentLoading || areRegsLoading || areSubjectsLoading;
+  const isLoading = isUserLoading || isStudentLoading || areRegsLoading;
   
-  const todayWeekday = new Date().toLocaleDateString('en-US', { weekday: 'long' });
-  const todaysSubjects = useMemo(() => 
-    enrolledSubjects.filter(subject => 
+  const todayWeekday = useMemo(() => new Date().toLocaleDateString('en-US', { weekday: 'long' }), []);
+  
+  const todaysSubjectIds = useMemo(() => 
+    enrolledSubjects?.filter(subject => 
         subject.lectureSchedules.some(s => s.day === todayWeekday) || 
         subject.labSchedules?.some(s => s.day === todayWeekday)
-    ), [enrolledSubjects, todayWeekday]);
-
+    ).map(s => s.id) ?? [], 
+  [enrolledSubjects, todayWeekday]);
 
   if (isLoading) {
     return (
@@ -408,12 +381,12 @@ export default function StudentDashboardPage() {
                 <CalendarCheck className="w-6 h-6 text-primary"/>
                 Today's Schedule
             </h2>
-             {todaysSubjects.length > 0 ? (
+             {areSubjectsLoading ? <Skeleton className="h-40" /> : todaysSubjectIds.length > 0 ? (
                 <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                    {todaysSubjects.map(subject => (
+                    {todaysSubjectIds.map(subjectId => (
                         <SubjectCard 
-                            key={subject.id}
-                            subject={subject}
+                            key={subjectId}
+                            subjectId={subjectId}
                             student={student}
                             isClient={isClient}
                             isDeviceRegistered={isDeviceRegistered}
@@ -436,12 +409,12 @@ export default function StudentDashboardPage() {
 
         <div>
              <h2 className="text-2xl font-headline font-bold mb-4">All My Subjects</h2>
-             {enrolledSubjects.length > 0 ? (
+             {areRegsLoading || areSubjectsLoading ? <Skeleton className="h-40" /> : userRegistrations && userRegistrations.length > 0 ? (
                 <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                    {enrolledSubjects.map((subject) => (
+                    {userRegistrations.map((reg) => (
                         <SubjectCard 
-                            key={subject.id}
-                            subject={subject}
+                            key={reg.subjectId}
+                            subjectId={reg.subjectId}
                             student={student}
                             isClient={isClient}
                             isDeviceRegistered={isDeviceRegistered}
