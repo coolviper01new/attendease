@@ -10,6 +10,8 @@ import { AnalyticalDashboard } from './components/analytical-dashboard';
 import { TacticalDashboard } from './components/tactical-dashboard';
 import { StrategicDashboard } from './components/strategic-dashboard';
 import { PageHeader } from '@/components/page-header';
+import { FirestorePermissionError } from '@/firebase/errors';
+import { errorEmitter } from '@/firebase/error-emitter';
 
 export type DashboardData = {
     students: Student[];
@@ -28,6 +30,12 @@ export default function AdminDashboardPage() {
     useEffect(() => {
         const fetchDashboardData = async () => {
             setIsLoading(true);
+
+            const handlePermissionError = (operation: 'list', path: string) => {
+                const permissionError = new FirestorePermissionError({ path, operation });
+                errorEmitter.emit('permission-error', permissionError);
+            };
+
             try {
                 const studentsQuery = query(collection(firestore, 'users'), where('role', '==', 'student'));
                 const subjectsQuery = query(collection(firestore, 'subjects'));
@@ -45,12 +53,12 @@ export default function AdminDashboardPage() {
                     attendanceSnapshot,
                     registrationsSnapshot,
                 ] = await Promise.all([
-                    getDocs(studentsQuery),
-                    getDocs(subjectsQuery),
-                    getDocs(activeSessionsQuery),
-                    getDocs(warningsQuery),
-                    getDocs(attendanceQuery),
-                    getDocs(registrationsQuery),
+                    getDocs(studentsQuery).catch(err => { handlePermissionError('list', 'users'); throw err; }),
+                    getDocs(subjectsQuery).catch(err => { handlePermissionError('list', 'subjects'); throw err; }),
+                    getDocs(activeSessionsQuery).catch(err => { handlePermissionError('list', 'attendanceSessions'); throw err; }),
+                    getDocs(warningsQuery).catch(err => { handlePermissionError('list', 'warnings'); throw err; }),
+                    getDocs(attendanceQuery).catch(err => { handlePermissionError('list', 'attendance'); throw err; }),
+                    getDocs(registrationsQuery).catch(err => { handlePermissionError('list', 'registrations'); throw err; }),
                 ]);
 
                 const students = studentsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })) as Student[];
@@ -70,7 +78,8 @@ export default function AdminDashboardPage() {
                     registrations,
                 });
             } catch (error) {
-                console.error("Failed to fetch dashboard data:", error);
+                // Errors are now handled by the handlePermissionError callback,
+                // so we don't need to console.error them here.
             } finally {
                 setIsLoading(false);
             }
