@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -81,7 +82,7 @@ const columns: ColumnDef<FormattedWarning>[] = [
 ]
 
 interface WarningsReportClientProps {
-  data: FormattedWarning[] | null | undefined;
+  data?: FormattedWarning[] | null;
   isLoading: boolean;
 }
 
