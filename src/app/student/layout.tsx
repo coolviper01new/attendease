@@ -157,6 +157,13 @@ function StudentHeader() {
             >
               <Link href="/student/enrollment">Enrollment</Link>
             </Button>
+             <Button
+              variant="ghost"
+              asChild
+              className="text-sm font-medium text-muted-foreground transition-colors hover:text-primary"
+            >
+              <Link href="/student/profile">Profile</Link>
+            </Button>
           </nav>
           {isLoading ? (
              <Skeleton className="h-10 w-10 rounded-full" />
@@ -185,9 +192,11 @@ function StudentHeader() {
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem>
-                  <User className="mr-2 h-4 w-4" />
-                  <span>Profile</span>
+                <DropdownMenuItem asChild>
+                  <Link href="/student/profile">
+                    <User className="mr-2 h-4 w-4" />
+                    <span>Profile</span>
+                  </Link>
                 </DropdownMenuItem>
                  {student?.deviceId && (
                   <DeregistrationDialog onConfirm={handleRequestDeregistration} />
