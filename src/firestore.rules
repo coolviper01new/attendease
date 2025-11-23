@@ -85,20 +85,37 @@ service cloud.firestore {
     /**
      * @description Governs collection group queries for attendance records.
      * @path /{path=**}/attendance/{attendanceId}
-     * @allow (list) Allows a signed-in user to query the 'attendance' collection group
-     *               but only if they are filtering for their own records.
-     *               Allows an admin to query by subject and date for reporting.
+     * @allow (list) Allows an admin to query all records for reporting.
      */
     match /{path=**}/attendance/{attendanceId} {
-        allow list: if isSignedIn() && request.query.where.studentId == request.auth.uid;
+        allow list: if isAdmin();
     }
     
+    /**
+     * @description Governs collection group queries for registration records.
+     * @path /{path=**}/registrations/{registrationId}
+     * @allow (list) Allows an admin to query all registrations.
+     */
     match /{path=**}/registrations/{registrationId} {
-      allow list: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+      allow list: if isAdmin();
     }
     
+    /**
+     * @description Governs collection group queries for warning records.
+     * @path /{path=**}/warnings/{warningId}
+     * @allow (list) Allows an admin to query all warnings.
+     */
     match /{path=**}/warnings/{warningId} {
         allow list: if isAdmin();
+    }
+
+    /**
+     * @description Governs collection group queries for attendance sessions.
+     * @path /{path=**}/attendanceSessions/{attendanceSessionId}
+     * @allow (list) Allows an admin to query active sessions.
+     */
+    match /{path=**}/attendanceSessions/{attendanceSessionId} {
+        allow list: if isAdmin() && request.query.where.isActive == true;
     }
 
 
@@ -253,5 +270,3 @@ service cloud.firestore {
     }
   }
 }
-
-    
