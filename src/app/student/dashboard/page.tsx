@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -293,33 +292,20 @@ export default function StudentDashboardPage() {
     const q = query(collection(firestore, 'subjects'), where('__name__', 'in', subjectIds));
 
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
-        const changes = querySnapshot.docChanges();
-        
         setEnrolledSubjects(prevSubjects => {
-            let newSubjects = [...prevSubjects];
+            const subjectsMap = new Map(prevSubjects.map(s => [s.id, s]));
             
-            changes.forEach(change => {
+            querySnapshot.docChanges().forEach((change) => {
                 const changedDoc = { ...change.doc.data(), id: change.doc.id } as Subject;
-                if (change.type === 'added') {
-                    if (!newSubjects.find(s => s.id === changedDoc.id)) {
-                        newSubjects.push(changedDoc);
-                    }
-                }
-                if (change.type === 'modified') {
-                    const index = newSubjects.findIndex(s => s.id === changedDoc.id);
-                    if (index > -1) {
-                        newSubjects[index] = changedDoc;
-                    } else {
-                        newSubjects.push(changedDoc);
-                    }
-                }
-                if (change.type === 'removed') {
-                    newSubjects = newSubjects.filter(s => s.id !== changedDoc.id);
+                if (change.type === "added" || change.type === "modified") {
+                    subjectsMap.set(change.doc.id, changedDoc);
+                } else if (change.type === "removed") {
+                    subjectsMap.delete(change.doc.id);
                 }
             });
-            return newSubjects;
-        });
 
+            return Array.from(subjectsMap.values());
+        });
         setAreSubjectsLoading(false);
     }, (error) => {
         console.error("Error fetching enrolled subjects in real-time", error);
