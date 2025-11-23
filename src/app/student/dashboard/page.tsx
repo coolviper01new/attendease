@@ -282,18 +282,25 @@ export default function StudentDashboardPage() {
         return;
     };
     
-    const subjectIds = userRegistrations.map(reg => reg.subjectId);
-    if(subjectIds.length === 0) {
-        setEnrolledSubjects([]);
-        setAreSubjectsLoading(false);
-        return;
+    if (userRegistrations.length === 0) {
+      setEnrolledSubjects([]);
+      setAreSubjectsLoading(false);
+      return;
     }
 
+    const subjectIds = userRegistrations.map(reg => reg.subjectId);
+    
     const q = query(collection(firestore, 'subjects'), where('__name__', 'in', subjectIds));
 
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
-        const subjectsData = querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })) as Subject[];
-        setEnrolledSubjects(subjectsData);
+        const updatedSubjects = querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }) as Subject[]);
+        setEnrolledSubjects(currentSubjects => {
+            const subjectsMap = new Map(currentSubjects.map(s => [s.id, s]));
+            updatedSubjects.forEach(subject => {
+                subjectsMap.set(subject.id, subject);
+            });
+            return Array.from(subjectsMap.values());
+        });
         setAreSubjectsLoading(false);
     }, (error) => {
         console.error("Error fetching enrolled subjects in real-time", error);
@@ -446,5 +453,3 @@ export default function StudentDashboardPage() {
     </>
   );
 }
-
-    
