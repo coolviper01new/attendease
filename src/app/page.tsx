@@ -85,11 +85,17 @@ export default function LandingPage() {
 
         <section className="bg-background py-20">
           <div className="container">
+             <div className="mx-auto max-w-2xl text-center mb-12">
+                <h2 className="text-3xl font-bold tracking-tight font-headline sm:text-4xl">Key Features</h2>
+                <p className="mt-2 text-lg text-muted-foreground">
+                    Everything you need to manage attendance efficiently and securely.
+                </p>
+            </div>
             <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
               {features.map((feature) => (
                 <Card
                   key={feature.title}
-                  className="flex flex-col bg-card/80 backdrop-blur-sm border-border/20 shadow-lg"
+                  className="flex flex-col bg-card/80 backdrop-blur-sm border-border/20 shadow-lg text-center"
                 >
                   <CardHeader className="flex flex-col items-center text-center p-6">
                     <div className="p-4 bg-primary/10 rounded-full mb-4">
