@@ -22,6 +22,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { AppWindow, AlertTriangle } from 'lucide-react';
 import { useAuth, useFirestore } from '@/firebase';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
@@ -62,8 +73,11 @@ export default function RegisterPage() {
 
     if (missingFields) {
       setError('Please fill out all required fields.');
-      return;
+      // This will close the dialog, but the error will be visible on the form.
+      // We return false to prevent the dialog from closing if we wanted it to stay open.
+      return false; 
     }
+
     setIsSubmitting(true);
     try {
       const userCredential = await createUserWithEmailAndPassword(
@@ -93,7 +107,6 @@ export default function RegisterPage() {
       
       setDocumentNonBlocking(userDocRef, userProfile, { merge: false });
 
-      // Since we navigate away, a toast is not suitable. The next page can show a welcome message.
       if (role === 'admin') {
         router.push('/admin/dashboard');
       } else {
@@ -112,7 +125,15 @@ export default function RegisterPage() {
     } finally {
         setIsSubmitting(false);
     }
+    return true;
   };
+  
+  const canTriggerDialog = () => {
+    if (!firstName || !lastName || !email || !password) return false;
+    if (role === 'student' && (!course || !studentNumber)) return false;
+    if (role === 'admin' && !facultyId) return false;
+    return true;
+  }
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-background py-12">
@@ -240,9 +261,36 @@ export default function RegisterPage() {
 
         </CardContent>
         <CardFooter className="flex flex-col gap-4">
-          <Button className="w-full" onClick={handleRegister} disabled={isSubmitting}>
-            {isSubmitting ? 'Registering...' : 'Create Account'}
-          </Button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+                <Button className="w-full" disabled={isSubmitting || !canTriggerDialog()}>
+                    Create Account
+                </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                <AlertDialogTitle>Privacy Statement & Terms of Service</AlertDialogTitle>
+                <AlertDialogDescription className="max-h-60 overflow-y-auto pr-4">
+                    Welcome to AttendEase! By creating an account, you agree to our terms and the collection and use of your information as described below.
+                    <br /><br />
+                    <strong>1. Information We Collect:</strong> We collect information you provide directly, such as your name, email, and role (student or teacher). We also collect device-specific information to securely link your account to your device for QR code generation.
+                    <br /><br />
+                    <strong>2. How We Use Your Information:</strong> Your data is used to provide, maintain, and improve our services, including managing attendance records, authenticating users, and ensuring the security of your account.
+                    <br /><br />
+                    <strong>3. Data Security:</strong> We implement security measures to protect your information from unauthorized access. Your QR codes are generated with a unique secret tied to the attendance session, ensuring that only valid scans are recorded.
+                    <br /><br />
+                    By clicking "Agree & Continue," you acknowledge that you have read, understood, and agree to be bound by these terms.
+                </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={handleRegister} disabled={isSubmitting}>
+                  {isSubmitting ? 'Registering...' : 'Agree & Continue'}
+                </AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+
           <div className="text-sm text-center text-muted-foreground">
             Already have an account?{' '}
             <Link href="/login" className="underline hover:text-primary">
