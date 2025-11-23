@@ -90,7 +90,7 @@ export function TacticalDashboard({ data, isLoading }: DashboardProps) {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {atRiskStudents.length > 0 ? atRiskStudents.map(({ student, absenceCount }) => (
+                            {atRiskStudents && atRiskStudents.length > 0 ? atRiskStudents.map(({ student, absenceCount }) => (
                                 <TableRow key={student!.id}>
                                     <TableCell>
                                         <div className="flex items-center gap-3">
@@ -133,7 +133,7 @@ export function TacticalDashboard({ data, isLoading }: DashboardProps) {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {lowAttendanceSubjects.length > 0 ? lowAttendanceSubjects.map(subject => (
+                            {lowAttendanceSubjects && lowAttendanceSubjects.length > 0 ? lowAttendanceSubjects.map(subject => (
                                 <TableRow key={subject.id}>
                                     <TableCell>{subject.name} ({subject.block})</TableCell>
                                     <TableCell className="text-right">
