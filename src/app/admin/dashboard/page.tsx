@@ -2,7 +2,7 @@
 'use client';
 import { useMemo, useState, useEffect } from 'react';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, query, where, collectionGroup, getDocs } from 'firebase/firestore';
+import { collection, query, where, collectionGroup, getDocs, getDoc } from 'firebase/firestore';
 import type { Subject, Student, AttendanceSession, Warning, Attendance, Registration } from '@/lib/types';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { InformationalDashboard } from './components/informational-dashboard';
@@ -39,7 +39,6 @@ export default function AdminDashboardPage() {
             try {
                 const studentsQuery = query(collection(firestore, 'users'), where('role', '==', 'student'));
                 const subjectsQuery = query(collection(firestore, 'subjects'));
-                const activeSessionsQuery = query(collectionGroup(firestore, 'attendanceSessions'), where('isActive', '==', true));
                 const warningsQuery = query(collectionGroup(firestore, 'warnings'));
                 const attendanceQuery = query(collectionGroup(firestore, 'attendance'));
                 const registrationsQuery = query(collectionGroup(firestore, 'registrations'));
@@ -48,14 +47,12 @@ export default function AdminDashboardPage() {
                 const [
                     studentsSnapshot,
                     subjectsSnapshot,
-                    activeSessionsSnapshot,
                     warningsSnapshot,
                     attendanceSnapshot,
                     registrationsSnapshot,
                 ] = await Promise.all([
                     getDocs(studentsQuery).catch(err => { handlePermissionError('list', 'users'); throw err; }),
                     getDocs(subjectsQuery).catch(err => { handlePermissionError('list', 'subjects'); throw err; }),
-                    getDocs(activeSessionsQuery).catch(err => { handlePermissionError('list', 'attendanceSessions'); throw err; }),
                     getDocs(warningsQuery).catch(err => { handlePermissionError('list', 'warnings'); throw err; }),
                     getDocs(attendanceQuery).catch(err => { handlePermissionError('list', 'attendance'); throw err; }),
                     getDocs(registrationsQuery).catch(err => { handlePermissionError('list', 'registrations'); throw err; }),
@@ -63,10 +60,26 @@ export default function AdminDashboardPage() {
 
                 const students = studentsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })) as Student[];
                 const subjects = subjectsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })) as Subject[];
-                const activeSessions = activeSessionsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })) as AttendanceSession[];
                 const warnings = warningsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })) as Warning[];
                 const attendance = attendanceSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })) as Attendance[];
                 const registrations = registrationsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })) as Registration[];
+                
+                // New strategy: Fetch active sessions per subject
+                let activeSessions: AttendanceSession[] = [];
+                for (const subject of subjects) {
+                    const activeSessionQuery = query(
+                        collection(firestore, 'subjects', subject.id, 'attendanceSessions'), 
+                        where('isActive', '==', true)
+                    );
+                    try {
+                        const activeSessionSnapshot = await getDocs(activeSessionQuery);
+                        activeSessionSnapshot.forEach(doc => {
+                             activeSessions.push({ ...doc.data(), id: doc.id } as AttendanceSession);
+                        });
+                    } catch (e) {
+                         handlePermissionError('list', `subjects/${subject.id}/attendanceSessions`);
+                    }
+                }
 
 
                 setDashboardData({
@@ -120,5 +133,3 @@ export default function AdminDashboardPage() {
         </>
     );
 }
-
-    
