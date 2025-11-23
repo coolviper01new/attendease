@@ -24,7 +24,7 @@ import {
 } from '@/components/ui/dialog';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useUser, useFirestore, useDoc, useCollection, useMemoFirebase } from '@/firebase';
-import { doc, collection, query, where, updateDoc, serverTimestamp, getDocs } from 'firebase/firestore';
+import { doc, collection, query, where, updateDoc, serverTimestamp, getDocs, collectionGroup } from 'firebase/firestore';
 import type { Student, Subject, Registration, Schedule, Attendance } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
@@ -505,4 +505,3 @@ export default function StudentDashboardPage() {
     </>
   );
 }
-
