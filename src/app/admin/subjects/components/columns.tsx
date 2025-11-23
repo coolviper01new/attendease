@@ -124,9 +124,9 @@ const SessionToggle = ({ subject, onRefresh }: { subject: Subject, onRefresh: ()
   
   return (
     <div className="flex items-center space-x-2">
-      <Switch id={`session-${subject.id}`} checked={!!activeSession} onCheckedChange={handleToggle} />
+      <Switch id={`session-${subject.id}`} checked={!!subject.isSessionActive} onCheckedChange={handleToggle} />
       <Label htmlFor={`session-${subject.id}`} className="text-xs text-muted-foreground">
-        {activeSession ? "Active" : "Inactive"}
+        {subject.isSessionActive ? "Active" : "Inactive"}
       </Label>
     </div>
   );
@@ -478,3 +478,5 @@ export const getColumns = ({ onEdit, onRefresh }: GetColumnsProps): ColumnDef<Su
     cell: (props) => <ActionsCell {...props} onEdit={onEdit} onRefresh={onRefresh} />,
   },
 ];
+
+    

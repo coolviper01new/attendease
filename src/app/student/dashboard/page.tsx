@@ -267,7 +267,7 @@ export default function StudentDashboardPage() {
     if (!user) return null;
     return query(collection(firestore, 'users', user.uid, 'registrations'));
   }, [firestore, user]);
-  const { data: userRegistrations, isLoading: areRegsLoading, forceRefresh } = useCollection<Registration>(registrationsQuery);
+  const { data: userRegistrations, isLoading: areRegsLoading } = useCollection<Registration>(registrationsQuery);
 
   useEffect(() => {
     setIsClient(true);
@@ -277,69 +277,32 @@ export default function StudentDashboardPage() {
   }, []);
   
    useEffect(() => {
-    const fetchEnrolledSubjects = async () => {
-      setAreSubjectsLoading(true);
-      if (userRegistrations && userRegistrations.length > 0) {
-        const subjectIds = userRegistrations.map(reg => reg.subjectId);
-        if (subjectIds.length === 0) {
-            setEnrolledSubjects([]);
-            setAreSubjectsLoading(false);
-            return;
-        }
-        
-        const subjectChunks: string[][] = [];
-        for (let i = 0; i < subjectIds.length; i += 10) {
-            subjectChunks.push(subjectIds.slice(i, i + 10));
-        }
-
-        const subjectPromises = subjectChunks.map(chunk => 
-            getDocs(query(collection(firestore, 'subjects'), where('__name__', 'in', chunk)))
-        );
-
-        try {
-            const subjectSnapshots = await Promise.all(subjectPromises);
-            const subjectsData = subjectSnapshots.flatMap(snapshot => 
-                snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Subject))
-            );
-            setEnrolledSubjects(subjectsData);
-        } catch (error) {
-            console.error("Error fetching enrolled subjects", error);
-        }
-
-      } else {
-        setEnrolledSubjects([]);
-      }
-      setAreSubjectsLoading(false);
+    if (areRegsLoading || !userRegistrations) {
+        setAreSubjectsLoading(true);
+        return;
     };
-
-    if(!areRegsLoading){
-        fetchEnrolledSubjects();
+    
+    const subjectIds = userRegistrations.map(reg => reg.subjectId);
+    if(subjectIds.length === 0) {
+        setEnrolledSubjects([]);
+        setAreSubjectsLoading(false);
+        return;
     }
+
+    const q = query(collection(firestore, 'subjects'), where('__name__', 'in', subjectIds));
+
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+        const subjectsData = querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })) as Subject[];
+        setEnrolledSubjects(subjectsData);
+        setAreSubjectsLoading(false);
+    }, (error) => {
+        console.error("Error fetching enrolled subjects in real-time", error);
+        setAreSubjectsLoading(false);
+    });
+
+    return () => unsubscribe();
   }, [userRegistrations, areRegsLoading, firestore]);
   
-  useEffect(() => {
-      // Set up a listener for real-time updates on subjects
-      if (!enrolledSubjects || enrolledSubjects.length === 0) return;
-
-      const subjectIds = enrolledSubjects.map(s => s.id);
-      if (subjectIds.length === 0) return;
-
-      const q = query(collection(firestore, 'subjects'), where('__name__', 'in', subjectIds));
-
-      const unsubscribe = onSnapshot(q, (querySnapshot) => {
-          const updatedSubjects = querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })) as Subject[];
-          setEnrolledSubjects(currentSubjects => {
-              const currentSubjectsMap = new Map(currentSubjects.map(s => [s.id, s]));
-              updatedSubjects.forEach(updated => {
-                  currentSubjectsMap.set(updated.id, updated);
-              });
-              return Array.from(currentSubjectsMap.values());
-          });
-      });
-
-      return () => unsubscribe();
-  }, [firestore, enrolledSubjects]);
-
 
   const handleRegisterDevice = async () => {
     if (!userDocRef || !currentDeviceId) return;
@@ -483,3 +446,5 @@ export default function StudentDashboardPage() {
     </>
   );
 }
+
+    
