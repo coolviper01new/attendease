@@ -245,8 +245,7 @@ service cloud.firestore {
      * @principle Restricts management of sensitive operations to admins, while allowing read access for participants.
      */
     match /subjects/{subjectId}/attendanceSessions/{attendanceSessionId} {
-      allow get: if isSignedIn();
-      allow list: if isSignedIn() && request.query.where.isActive == true;
+      allow get: if isAdmin(); // Only admins can get a single session document to see the secret
       allow create: if isAdmin();
       allow update, delete: if isAdmin() && isExistingDoc();
 
@@ -268,7 +267,9 @@ service cloud.firestore {
         allow delete: if isAdmin() && isExistingDoc();
       }
     }
+    
+    match /subjects/{subjectId}/attendanceSessions {
+        allow list: if isSignedIn();
+    }
   }
 }
-
-    
