@@ -81,7 +81,7 @@ const columns: ColumnDef<FormattedWarning>[] = [
 ]
 
 interface WarningsReportClientProps {
-  data: FormattedWarning[];
+  data: FormattedWarning[] | null | undefined;
   isLoading: boolean;
 }
 
@@ -90,7 +90,7 @@ export function WarningsReportClient({ data, isLoading }: WarningsReportClientPr
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
 
   const table = useReactTable({
-    data,
+    data: data || [],
     columns,
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
