@@ -115,7 +115,7 @@ service cloud.firestore {
      * @allow (list) Allows an admin to query active sessions.
      */
     match /{path=**}/attendanceSessions/{attendanceSessionId} {
-        allow list: if isAdmin() && request.query.where.isActive == true;
+        allow list: if isAdmin();
     }
 
 
@@ -270,5 +270,3 @@ service cloud.firestore {
     }
   }
 }
-
-    
