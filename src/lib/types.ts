@@ -2,6 +2,7 @@
 
 
 
+
 export type SchoolYear = {
   id: string;
   name: string;
@@ -50,6 +51,9 @@ export type Subject = {
   yearLevel: string;
   enrollmentStatus: 'closed' | 'open';
   deleted?: boolean;
+  isSessionActive?: boolean;
+  activeSessionId?: string;
+  activeSessionSecret?: string;
 };
 
 export type Registration = {

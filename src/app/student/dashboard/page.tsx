@@ -38,7 +38,6 @@ const QrCodeDialog = ({
   isDeviceRegistered,
   isCurrentDevice,
   onRegister,
-  activeSession,
   isOpen,
   onOpenChange,
 }: {
@@ -47,7 +46,6 @@ const QrCodeDialog = ({
   isDeviceRegistered: boolean;
   isCurrentDevice: boolean;
   onRegister: () => void;
-  activeSession?: AttendanceSession;
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
 }) => {
@@ -71,7 +69,7 @@ const QrCodeDialog = ({
     );
   }
 
-  if (!activeSession) {
+  if (!subject.isSessionActive) {
      return (
       <Alert className="mt-4 text-center">
         <Info className="h-4 w-4" />
@@ -83,7 +81,7 @@ const QrCodeDialog = ({
     );
   }
 
-  const qrData = JSON.stringify({ studentId, subjectId: subject.id, qrCodeSecret: activeSession.qrCodeSecret });
+  const qrData = JSON.stringify({ studentId, subjectId: subject.id, qrCodeSecret: subject.activeSessionSecret });
   const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(
     qrData
   )}`;
@@ -131,16 +129,10 @@ const SubjectCard = ({ subject, student, isClient, isDeviceRegistered, isCurrent
     const [isConfirmed, setIsConfirmed] = useState(false);
     const [countdown, setCountdown] = useState(5);
     
-    const activeSessionQuery = useMemoFirebase(() => 
-        query(collection(firestore, 'subjects', subject.id, 'attendanceSessions'), where('isActive', '==', true))
-    , [firestore, subject.id]);
-    const { data: activeSessions } = useCollection<AttendanceSession>(activeSessionQuery);
-    const activeSession = activeSessions?.[0];
-
     const studentAttendanceDocRef = useMemoFirebase(() => {
-        if (!activeSession || !student) return null;
-        return doc(firestore, `subjects/${subject.id}/attendanceSessions/${activeSession.id}/attendance`, student.id);
-    }, [firestore, subject.id, activeSession, student]);
+        if (!subject.isSessionActive || !student) return null;
+        return doc(firestore, `subjects/${subject.id}/attendanceSessions/${subject.activeSessionId}/attendance`, student.id);
+    }, [firestore, subject.id, subject.isSessionActive, subject.activeSessionId, student]);
 
     const { data: attendanceRecord } = useDoc<Attendance>(studentAttendanceDocRef);
 
@@ -152,7 +144,7 @@ const SubjectCard = ({ subject, student, isClient, isDeviceRegistered, isCurrent
             setIsQrDialogOpen(false); // Close QR dialog on confirmation
             setCountdown(5);
         }
-    }, [isPresent, isConfirmed, activeSession]);
+    }, [isPresent, isConfirmed]);
 
     useEffect(() => {
         let timer: NodeJS.Timeout;
@@ -203,7 +195,6 @@ const SubjectCard = ({ subject, student, isClient, isDeviceRegistered, isCurrent
                 isDeviceRegistered={isDeviceRegistered}
                 isCurrentDevice={isCurrentDevice}
                 onRegister={onRegisterDevice}
-                activeSession={activeSession}
                 isOpen={isQrDialogOpen}
                 onOpenChange={setIsQrDialogOpen}
             />
@@ -276,7 +267,7 @@ export default function StudentDashboardPage() {
     if (!user) return null;
     return query(collection(firestore, 'users', user.uid, 'registrations'));
   }, [firestore, user]);
-  const { data: userRegistrations, isLoading: areRegsLoading } = useCollection<Registration>(registrationsQuery);
+  const { data: userRegistrations, isLoading: areRegsLoading, forceRefresh } = useCollection<Registration>(registrationsQuery);
 
   useEffect(() => {
     setIsClient(true);
@@ -325,6 +316,30 @@ export default function StudentDashboardPage() {
         fetchEnrolledSubjects();
     }
   }, [userRegistrations, areRegsLoading, firestore]);
+  
+  useEffect(() => {
+      // Set up a listener for real-time updates on subjects
+      if (!enrolledSubjects || enrolledSubjects.length === 0) return;
+
+      const subjectIds = enrolledSubjects.map(s => s.id);
+      if (subjectIds.length === 0) return;
+
+      const q = query(collection(firestore, 'subjects'), where('__name__', 'in', subjectIds));
+
+      const unsubscribe = onSnapshot(q, (querySnapshot) => {
+          const updatedSubjects = querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })) as Subject[];
+          setEnrolledSubjects(currentSubjects => {
+              const currentSubjectsMap = new Map(currentSubjects.map(s => [s.id, s]));
+              updatedSubjects.forEach(updated => {
+                  currentSubjectsMap.set(updated.id, updated);
+              });
+              return Array.from(currentSubjectsMap.values());
+          });
+      });
+
+      return () => unsubscribe();
+  }, [firestore, enrolledSubjects]);
+
 
   const handleRegisterDevice = async () => {
     if (!userDocRef || !currentDeviceId) return;

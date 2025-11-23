@@ -50,53 +50,73 @@ import { AttendanceListDialog } from "./attendance-list-dialog";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 
-const SessionToggle = ({ subjectId, onRefresh }: { subjectId: string, onRefresh: () => void }) => {
+const SessionToggle = ({ subject, onRefresh }: { subject: Subject, onRefresh: () => void }) => {
   const firestore = useFirestore();
+  const subjectRef = doc(firestore, 'subjects', subject.id);
   const sessionsQuery = useMemoFirebase(() => 
-    query(collection(firestore, 'subjects', subjectId, 'attendanceSessions'), where('isActive', '==', true))
-  , [firestore, subjectId]);
+    query(collection(firestore, 'subjects', subject.id, 'attendanceSessions'), where('isActive', '==', true))
+  , [firestore, subject.id]);
+  
   const { data: sessions, isLoading, forceRefresh } = useCollection<TAttendanceSession>(sessionsQuery);
-
   const activeSession = sessions?.[0];
 
   const handleToggle = async (checked: boolean) => {
     if (checked && !activeSession) {
-      const newSessionSecret = `secret-${subjectId}-${Date.now()}`;
-      const sessionCollectionRef = collection(firestore, 'subjects', subjectId, 'attendanceSessions');
+      // Start a new session
+      const newSessionSecret = `secret-${subject.id}-${Date.now()}`;
+      const sessionCollectionRef = collection(firestore, 'subjects', subject.id, 'attendanceSessions');
       const sessionData = {
-        subjectId: subjectId,
+        subjectId: subject.id,
         startTime: serverTimestamp(),
         isActive: true,
         qrCodeSecret: newSessionSecret
       };
-      addDoc(sessionCollectionRef, sessionData).catch(err => {
-        errorEmitter.emit('permission-error', new FirestorePermissionError({
+      
+      try {
+        const newSessionDoc = await addDoc(sessionCollectionRef, sessionData);
+        // Update parent subject
+        await updateDoc(subjectRef, { 
+          isSessionActive: true, 
+          activeSessionId: newSessionDoc.id,
+          activeSessionSecret: newSessionSecret 
+        });
+      } catch (err) {
+         errorEmitter.emit('permission-error', new FirestorePermissionError({
           path: sessionCollectionRef.path,
           operation: 'create',
           requestResourceData: sessionData,
         }));
-      });
-      forceRefresh();
-      onRefresh();
+      }
+
     } else if (!checked && activeSession) {
-      const sessionRef = doc(firestore, 'subjects', subjectId, 'attendanceSessions', activeSession.id);
+      // Stop the current session
+      const sessionRef = doc(firestore, 'subjects', subject.id, 'attendanceSessions', activeSession.id);
       const sessionData = { isActive: false, endTime: serverTimestamp() };
-      updateDoc(sessionRef, sessionData).catch(err => {
-        errorEmitter.emit('permission-error', new FirestorePermissionError({
+       const subjectUpdateData = { 
+        isSessionActive: false, 
+        activeSessionId: null,
+        activeSessionSecret: null
+      };
+
+      try {
+        await updateDoc(sessionRef, sessionData);
+        await updateDoc(subjectRef, subjectUpdateData);
+      } catch (err) {
+         errorEmitter.emit('permission-error', new FirestorePermissionError({
           path: sessionRef.path,
           operation: 'update',
           requestResourceData: sessionData,
         }));
-      });
-      forceRefresh();
-      onRefresh();
+      }
     }
+    forceRefresh();
+    onRefresh();
   };
 
   if (isLoading) {
     return <div className="flex items-center space-x-2">
-      <Switch id={`session-${subjectId}`} disabled />
-      <Label htmlFor={`session-${subjectId}`} className="text-xs text-muted-foreground">
+      <Switch id={`session-${subject.id}`} disabled />
+      <Label htmlFor={`session-${subject.id}`} className="text-xs text-muted-foreground">
         Loading...
       </Label>
     </div>
@@ -104,8 +124,8 @@ const SessionToggle = ({ subjectId, onRefresh }: { subjectId: string, onRefresh:
   
   return (
     <div className="flex items-center space-x-2">
-      <Switch id={`session-${subjectId}`} checked={!!activeSession} onCheckedChange={handleToggle} />
-      <Label htmlFor={`session-${subjectId}`} className="text-xs text-muted-foreground">
+      <Switch id={`session-${subject.id}`} checked={!!activeSession} onCheckedChange={handleToggle} />
+      <Label htmlFor={`session-${subject.id}`} className="text-xs text-muted-foreground">
         {activeSession ? "Active" : "Inactive"}
       </Label>
     </div>
@@ -450,7 +470,7 @@ export const getColumns = ({ onEdit, onRefresh }: GetColumnsProps): ColumnDef<Su
     header: "Session Status",
     cell: ({ row }) => {
         if (row.getIsGrouped()) return null;
-        return <SessionToggle subjectId={row.original.id} onRefresh={onRefresh} />
+        return <SessionToggle subject={row.original} onRefresh={onRefresh} />
     },
   },
   {
