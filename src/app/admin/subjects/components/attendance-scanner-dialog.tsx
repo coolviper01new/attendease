@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
@@ -331,13 +330,19 @@ export function AttendanceScannerDialog({
             setPresentStudents(prev => [...prev, studentData].sort((a,b) => a.firstName.localeCompare(b.firstName)));
 
             const attendanceDocRef = doc(firestore, `subjects/${subject.id}/attendanceSessions/${activeSession.id}/attendance`, qrData.studentId);
+            const today = new Date();
+            const year = today.getFullYear();
+            const month = (today.getMonth() + 1).toString().padStart(2, '0');
+            const day = today.getDate().toString().padStart(2, '0');
+            const formattedDate = `${year}-${month}-${day}`;
+
             const attendanceData = {
               studentId: qrData.studentId,
               subjectId: subject.id,
               timestamp: serverTimestamp(),
               status: 'present',
               recordedBy: adminUser.uid,
-              date: new Date().toISOString(),
+              date: formattedDate,
             };
             setDoc(attendanceDocRef, attendanceData).catch(error => {
                 errorEmitter.emit(
@@ -454,7 +459,7 @@ export function AttendanceScannerDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onDialogClose}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-6xl h-[90vh]">
         <DialogHeader className="text-center">
           <DialogTitle className="text-3xl font-bold font-headline">Attendance Scanner</DialogTitle>

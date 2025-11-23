@@ -20,7 +20,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collectionGroup, query, where, orderBy } from 'firebase/firestore';
+import { collectionGroup, query, where, orderBy, collection } from 'firebase/firestore';
 import type { Subject, Student, Attendance } from '@/lib/types';
 import { ListChecks } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -41,23 +41,19 @@ export function AttendanceDialog({
   const firestore = useFirestore();
 
   const attendanceQuery = useMemoFirebase(() => {
-    if (!student) return null;
-    // Query is simplified to only what is allowed by security rules for students.
+    if (!student || !isOpen) return null;
+    // This query fetches all attendance sessions for the subject, then we can look up the student's record.
+    // It's more complex but required by the security rules for students.
+    // A more direct approach would be a collectionGroup query on attendance, filtered by studentId and subjectId.
     return query(
-      collectionGroup(firestore, 'attendance'),
-      where('studentId', '==', student.id),
-      orderBy('timestamp', 'desc')
+        collectionGroup(firestore, 'attendance'),
+        where('studentId', '==', student.id),
+        where('subjectId', '==', subject.id),
+        orderBy('timestamp', 'desc')
     );
-  }, [firestore, student]);
+  }, [firestore, student, subject.id, isOpen]);
 
-  const { data: allAttendanceRecords, isLoading } =
-    useCollection<Attendance>(attendanceQuery);
-
-  const subjectAttendanceRecords = useMemo(() => {
-    if (!allAttendanceRecords) return [];
-    return allAttendanceRecords.filter(rec => rec.subjectId === subject.id);
-  }, [allAttendanceRecords, subject.id]);
-
+  const { data: subjectAttendanceRecords, isLoading } = useCollection<Attendance>(attendanceQuery);
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -95,7 +91,7 @@ export function AttendanceDialog({
                 subjectAttendanceRecords.map((record) => (
                   <TableRow key={record.id}>
                     <TableCell>
-                      {record.date ? new Date(record.date).toLocaleDateString('en-US', {
+                      {record.timestamp ? record.timestamp.toDate().toLocaleDateString('en-US', {
                         year: 'numeric',
                         month: 'long',
                         day: 'numeric',

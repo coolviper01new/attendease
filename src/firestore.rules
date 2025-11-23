@@ -85,10 +85,10 @@ service cloud.firestore {
     /**
      * @description Governs collection group queries for attendance records.
      * @path /{path=**}/attendance/{attendanceId}
-     * @allow (list) Allows an admin to query all records for reporting.
+     * @allow (list) Allows an admin to query all records for reporting, and a student to query their own.
      */
     match /{path=**}/attendance/{attendanceId} {
-        allow list: if isAdmin() || (isSignedIn() && request.auth.uid == request.query.where.value[0]);
+        allow list: if isAdmin() || (isSignedIn() && request.auth.uid == request.query.where[0].value);
     }
     
     /**
