@@ -115,13 +115,11 @@ const SubjectCard = ({ subjectId, student, isClient, isDeviceRegistered, isCurre
     student: Student | null;
     isClient: boolean;
     isDeviceRegistered: boolean;
-
     isCurrentDevice: boolean;
     onRegisterDevice: () => void;
     isToday?: boolean;
 }) => {
     const firestore = useFirestore();
-    const [isQrDialogOpen, setIsQrDialogOpen] = useState(false);
     const [isAttendanceDialogOpen, setIsAttendanceDialogOpen] = useState(false);
     const [isConfirmed, setIsConfirmed] = useState(false);
     const [countdown, setCountdown] = useState(5);
@@ -130,6 +128,7 @@ const SubjectCard = ({ subjectId, student, isClient, isDeviceRegistered, isCurre
         if (!subjectId) return null;
         return doc(firestore, 'subjects', subjectId);
     }, [firestore, subjectId]);
+    
     const { data: subject, isLoading: isSubjectLoading } = useDoc<Subject>(subjectDocRef);
 
     const studentAttendanceDocRef = useMemoFirebase(() => {
@@ -144,7 +143,6 @@ const SubjectCard = ({ subjectId, student, isClient, isDeviceRegistered, isCurre
      useEffect(() => {
         if (isPresent && !isConfirmed) {
             setIsConfirmed(true);
-            setIsQrDialogOpen(false); // Close QR dialog on confirmation
             setCountdown(5);
         }
     }, [isPresent, isConfirmed]);
@@ -185,7 +183,7 @@ const SubjectCard = ({ subjectId, student, isClient, isDeviceRegistered, isCurre
 
     const renderFooter = () => {
         if (!isClient || !student) {
-            return null; // Or a skeleton/placeholder
+            return null;
         }
         if (isConfirmed) {
             return (
@@ -278,6 +276,14 @@ export default function StudentDashboardPage() {
     return query(collection(firestore, 'users', user.uid, 'registrations'));
   }, [firestore, user]);
   const { data: userRegistrations, isLoading: areRegsLoading } = useCollection<Registration>(registrationsQuery);
+  
+  const enrolledSubjectIds = useMemo(() => userRegistrations?.map(reg => reg.subjectId) ?? [], [userRegistrations]);
+
+  const subjectsQuery = useMemoFirebase(() => {
+    if (enrolledSubjectIds.length === 0) return null;
+    return query(collection(firestore, 'subjects'), where('__name__', 'in', enrolledSubjectIds));
+  }, [enrolledSubjectIds, firestore]);
+  const { data: enrolledSubjects, isLoading: areSubjectsLoading } = useCollection<Subject>(subjectsQuery);
 
   useEffect(() => {
     setIsClient(true);
@@ -300,17 +306,10 @@ export default function StudentDashboardPage() {
       }))
     })
   };
-  
-  const subjectsQuery = useMemoFirebase(() => {
-      if (!userRegistrations || userRegistrations.length === 0) return null;
-      const subjectIds = userRegistrations.map(reg => reg.subjectId);
-      return query(collection(firestore, 'subjects'), where('__name__', 'in', subjectIds));
-  }, [userRegistrations, firestore]);
-  const { data: enrolledSubjects, isLoading: areSubjectsLoading } = useCollection<Subject>(subjectsQuery);
 
   const isDeviceRegistered = !!student?.deviceId;
   const isCurrentDevice = isDeviceRegistered && student?.deviceId === currentDeviceId;
-  const isLoading = isUserLoading || isStudentLoading || areRegsLoading;
+  const isLoading = isUserLoading || isStudentLoading || areRegsLoading || areSubjectsLoading;
   
   const todayWeekday = useMemo(() => new Date().toLocaleDateString('en-US', { weekday: 'long' }), []);
   
@@ -381,7 +380,7 @@ export default function StudentDashboardPage() {
                 <CalendarCheck className="w-6 h-6 text-primary"/>
                 Today's Schedule
             </h2>
-             {areSubjectsLoading ? <Skeleton className="h-40" /> : todaysSubjectIds.length > 0 ? (
+             {todaysSubjectIds.length > 0 ? (
                 <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                     {todaysSubjectIds.map(subjectId => (
                         <SubjectCard 
@@ -409,12 +408,12 @@ export default function StudentDashboardPage() {
 
         <div>
              <h2 className="text-2xl font-headline font-bold mb-4">All My Subjects</h2>
-             {areRegsLoading || areSubjectsLoading ? <Skeleton className="h-40" /> : userRegistrations && userRegistrations.length > 0 ? (
+             {enrolledSubjectIds.length > 0 ? (
                 <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                    {userRegistrations.map((reg) => (
+                    {enrolledSubjectIds.map((subjectId) => (
                         <SubjectCard 
-                            key={reg.subjectId}
-                            subjectId={reg.subjectId}
+                            key={subjectId}
+                            subjectId={subjectId}
                             student={student}
                             isClient={isClient}
                             isDeviceRegistered={isDeviceRegistered}
