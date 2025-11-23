@@ -40,7 +40,7 @@ export function InformationalDashboard({ data, isLoading }: DashboardProps) {
     const stats = {
         totalStudents: data?.students.length ?? 0,
         totalSubjects: data?.subjects.length ?? 0,
-        activeSessions: data?.activeSessions.length ?? 0,
+        activeSessions: data?.activeSessions?.length ?? 0,
         todaysWarnings: todaysWarnings,
     }
 
@@ -119,7 +119,7 @@ export function InformationalDashboard({ data, isLoading }: DashboardProps) {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                               {data && data.activeSessions.length > 0 ? data.activeSessions.map(session => {
+                               {data?.activeSessions && data.activeSessions.length > 0 ? data.activeSessions.map(session => {
                                    const subject = data.subjects.find(s => s.id === session.subjectId);
                                    return (
                                         <TableRow key={session.id}>
