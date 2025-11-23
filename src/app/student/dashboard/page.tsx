@@ -301,23 +301,19 @@ export default function StudentDashboardPage() {
             changes.forEach(change => {
                 const changedDoc = { ...change.doc.data(), id: change.doc.id } as Subject;
                 if (change.type === 'added') {
-                    // This handles both initial fetch and new enrollments.
                     if (!newSubjects.find(s => s.id === changedDoc.id)) {
                         newSubjects.push(changedDoc);
                     }
                 }
                 if (change.type === 'modified') {
-                    // A subject's details (like session status) were updated.
                     const index = newSubjects.findIndex(s => s.id === changedDoc.id);
                     if (index > -1) {
                         newSubjects[index] = changedDoc;
                     } else {
-                        // This case is unlikely but handles if a modified doc wasn't in the state.
                         newSubjects.push(changedDoc);
                     }
                 }
                 if (change.type === 'removed') {
-                    // A student was unenrolled.
                     newSubjects = newSubjects.filter(s => s.id !== changedDoc.id);
                 }
             });
@@ -327,7 +323,6 @@ export default function StudentDashboardPage() {
         setAreSubjectsLoading(false);
     }, (error) => {
         console.error("Error fetching enrolled subjects in real-time", error);
-        // Optionally handle permission errors here
         setAreSubjectsLoading(false);
     });
 
