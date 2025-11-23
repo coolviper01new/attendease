@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -151,7 +152,7 @@ export function AttendanceReportClient({ data, isLoading }: AttendanceReportClie
             ) : (
               <TableRow>
                 <TableCell colSpan={columns.length} className="h-24 text-center">
-                  No results.
+                  Please select a subject and a date to view attendance records.
                 </TableCell>
               </TableRow>
             )}
@@ -161,3 +162,5 @@ export function AttendanceReportClient({ data, isLoading }: AttendanceReportClie
     </div>
   );
 }
+
+    

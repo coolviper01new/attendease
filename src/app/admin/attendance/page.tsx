@@ -1,3 +1,4 @@
+
 'use client';
 import { PageHeader } from "@/components/page-header";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -7,7 +8,7 @@ import { AttendanceReportClient } from "./components/attendance-report-client";
 import { WarningsReportClient } from "./components/warnings-report-client";
 import { Card, CardContent } from "@/components/ui/card";
 import { useFirestore } from "@/firebase";
-import { collection, collectionGroup, getDocs, query } from "firebase/firestore";
+import { collection, collectionGroup, getDocs, query, where } from "firebase/firestore";
 import { useEffect, useState, useMemo } from "react";
 import type { Attendance, Subject, User, Warning } from "@/lib/types";
 import { FirestorePermissionError } from "@/firebase/errors";
@@ -23,64 +24,49 @@ export default function AdminAttendancePage() {
     const [allAttendance, setAllAttendance] = useState<any[]>([]);
     const [allWarnings, setAllWarnings] = useState<any[]>([]);
     const [allSubjects, setAllSubjects] = useState<(Subject & {id: string})[]>([]);
+    const [allStudents, setAllStudents] = useState<(User & {id: string, name: string})[]>([]);
     
-    const [isLoading, setIsLoading] = useState(true);
+    const [isAttendanceLoading, setIsAttendanceLoading] = useState(false);
+    const [isInitialLoading, setIsInitialLoading] = useState(true);
 
     const [selectedSubjectId, setSelectedSubjectId] = useState<string | null>(null);
     const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
 
+    // Initial data fetch for students, subjects, and warnings
     useEffect(() => {
         const controller = new AbortController();
         const signal = controller.signal;
 
-        const fetchData = async () => {
-            setIsLoading(true);
+        const fetchInitialData = async () => {
+            setIsInitialLoading(true);
             
             try {
                 const studentsQuery = query(collection(firestore, 'users'));
                 const subjectsQuery = query(collection(firestore, 'subjects'));
+                const warningsQuery = query(collectionGroup(firestore, 'warnings'));
 
                 const handlePermissionError = (operation: 'list', path: string) => {
                     const permissionError = new FirestorePermissionError({ path, operation });
                     errorEmitter.emit('permission-error', permissionError);
                 };
 
-                const [studentsSnapshot, subjectsSnapshot] = await Promise.all([
+                const [studentsSnapshot, subjectsSnapshot, warningsSnapshot] = await Promise.all([
                     getDocs(studentsQuery).catch(err => { handlePermissionError('list', 'users'); throw err; }),
                     getDocs(subjectsQuery).catch(err => { handlePermissionError('list', 'subjects'); throw err; }),
+                    getDocs(warningsQuery).catch(err => { handlePermissionError('list', 'warnings'); throw err; })
                 ]);
 
                 if (signal.aborted) return;
 
                 const students = studentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as (User & {id: string, name: string})[];
                 const subjects = subjectsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as (Subject & {id: string})[];
-                setAllSubjects(subjects);
-
-                const attendanceQuery = query(collectionGroup(firestore, 'attendance'));
-                const warningsQuery = query(collectionGroup(firestore, 'warnings'));
                 
-                const [attendanceSnapshot, warningsSnapshot] = await Promise.all([
-                     getDocs(attendanceQuery).catch(err => { handlePermissionError('list', 'attendance'); throw err; }),
-                     getDocs(warningsQuery).catch(err => { handlePermissionError('list', 'warnings'); throw err; })
-                ]);
-                
-                if (signal.aborted) return;
+                if(!signal.aborted) {
+                    setAllStudents(students);
+                    setAllSubjects(subjects);
+                }
 
-                const attendance = attendanceSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as (Attendance & {id: string})[];
                 const warnings = warningsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as (Warning & {id: string})[];
-
-                const fa = attendance.map(att => {
-                    const student = students.find(s => s.id === att.studentId);
-                    const subject = subjects.find(s => s.id === att.subjectId);
-                    return {
-                        ...att,
-                        studentName: student ? `${student.firstName} ${student.lastName}` : 'N/A',
-                        subjectName: subject?.name || 'N/A',
-                        date: new Date(att.date).toISOString() 
-                    };
-                });
-                
-                if (!signal.aborted) setAllAttendance(fa);
                 
                 const fw = warnings.map(warn => {
                     const student = students.find(s => s.id === warn.studentId);
@@ -98,32 +84,86 @@ export default function AdminAttendancePage() {
                 if ((error as any).name !== 'AbortError' && (error as any).code?.startsWith('permission-denied')) {
                      // Error is already emitted
                 } else if ((error as any).name !== 'AbortError') {
-                    console.error("Failed to fetch reports data:", error);
+                    console.error("Failed to fetch initial reports data:", error);
                 }
             } finally {
-                if (!signal.aborted) setIsLoading(false);
+                if (!signal.aborted) setIsInitialLoading(false);
             }
         };
 
-        fetchData();
+        fetchInitialData();
 
         return () => controller.abort();
     }, [firestore]);
-    
-    const filteredAttendance = useMemo(() => {
-        return allAttendance.filter(att => {
-            const subjectMatch = !selectedSubjectId || att.subjectId === selectedSubjectId;
-            const dateMatch = !selectedDate || format(new Date(att.date), 'yyyy-MM-dd') === format(selectedDate, 'yyyy-MM-dd');
-            return subjectMatch && dateMatch;
-        });
-    }, [allAttendance, selectedSubjectId, selectedDate]);
 
+    // Fetch attendance data only when filters are applied
+    useEffect(() => {
+        const controller = new AbortController();
+        const signal = controller.signal;
+
+        const fetchAttendanceData = async () => {
+            if (!selectedSubjectId || !selectedDate) {
+                setAllAttendance([]); // Clear attendance if filters are not set
+                return;
+            };
+
+            setIsAttendanceLoading(true);
+            setAllAttendance([]);
+            
+            try {
+                const formattedDate = format(selectedDate, 'yyyy-MM-dd');
+                const attendanceQuery = query(
+                    collectionGroup(firestore, 'attendance'), 
+                    where('subjectId', '==', selectedSubjectId),
+                    where('date', '>=', `${formattedDate}T00:00:00`),
+                    where('date', '<=', `${formattedDate}T23:59:59`)
+                );
+                
+                const attendanceSnapshot = await getDocs(attendanceQuery).catch(err => {
+                    const permissionError = new FirestorePermissionError({ path: `attendance (subjectId: ${selectedSubjectId}, date: ${formattedDate})`, operation: 'list' });
+                    errorEmitter.emit('permission-error', permissionError);
+                    throw err;
+                });
+
+                if (signal.aborted) return;
+                
+                const attendance = attendanceSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as (Attendance & {id: string})[];
+
+                const fa = attendance.map(att => {
+                    const student = allStudents.find(s => s.id === att.studentId);
+                    const subject = allSubjects.find(s => s.id === att.subjectId);
+                    return {
+                        ...att,
+                        studentName: student ? `${student.firstName} ${student.lastName}` : 'N/A',
+                        subjectName: subject?.name || 'N/A',
+                        date: new Date(att.date).toISOString() 
+                    };
+                });
+                
+                if (!signal.aborted) setAllAttendance(fa);
+
+            } catch (error) {
+                if ((error as any).name !== 'AbortError' && !(error as any).code?.startsWith('permission-denied')) {
+                    console.error("Failed to fetch attendance data:", error);
+                }
+            } finally {
+                if (!signal.aborted) setIsAttendanceLoading(false);
+            }
+        };
+        
+        fetchAttendanceData();
+
+        return () => controller.abort();
+    }, [selectedSubjectId, selectedDate, firestore, allStudents, allSubjects]);
+    
     const filteredWarnings = useMemo(() => {
          return allWarnings.filter(warn => {
             const subjectMatch = !selectedSubjectId || warn.subjectId === selectedSubjectId;
             return subjectMatch;
         });
     }, [allWarnings, selectedSubjectId]);
+
+    const isLoading = isInitialLoading || isAttendanceLoading;
 
   return (
     <>
@@ -179,14 +219,14 @@ export default function AdminAttendancePage() {
         <TabsContent value="attendance" className="mt-4">
             <Card>
                 <CardContent>
-                    <AttendanceReportClient data={filteredAttendance} isLoading={isLoading} />
+                    <AttendanceReportClient data={allAttendance} isLoading={isLoading} />
                 </CardContent>
             </Card>
         </TabsContent>
         <TabsContent value="warnings" className="mt-4">
             <Card>
                 <CardContent>
-                    <WarningsReportClient data={filteredWarnings} isLoading={isLoading} />
+                    <WarningsReportClient data={filteredWarnings} isLoading={isInitialLoading} />
                 </CardContent>
             </Card>
         </TabsContent>
@@ -194,3 +234,5 @@ export default function AdminAttendancePage() {
     </>
   );
 }
+
+    
