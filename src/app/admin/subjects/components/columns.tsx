@@ -478,3 +478,5 @@ export const getColumns = ({ onEdit, onRefresh }: GetColumnsProps): ColumnDef<Su
     cell: (props) => <ActionsCell {...props} onEdit={onEdit} onRefresh={onRefresh} />,
   },
 ];
+
+    
