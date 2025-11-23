@@ -246,7 +246,6 @@ service cloud.firestore {
      */
     match /subjects/{subjectId}/attendanceSessions/{attendanceSessionId} {
       allow get: if isSignedIn();
-      allow list: if isAdmin() && request.query.where.isActive == true;
       allow create: if isAdmin();
       allow update, delete: if isAdmin() && isExistingDoc();
 
