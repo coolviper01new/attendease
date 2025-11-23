@@ -62,7 +62,7 @@ export default function AdminAttendancePage() {
                 const subjects = subjectsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as (Subject & {id: string})[];
                 
                 if(!signal.aborted) {
-                    setAllStudents(students);
+                    setAllStudents(students.map(s => ({...s, name: `${s.firstName} ${s.lastName}`})));
                     setAllSubjects(subjects);
                 }
 
@@ -136,7 +136,7 @@ export default function AdminAttendancePage() {
                         ...att,
                         studentName: student ? `${student.firstName} ${student.lastName}` : 'N/A',
                         subjectName: subject?.name || 'N/A',
-                        date: new Date(att.date).toISOString() 
+                        date: att.timestamp?.toDate().toISOString() || new Date().toISOString()
                     };
                 });
                 
@@ -157,10 +157,10 @@ export default function AdminAttendancePage() {
     }, [selectedSubjectId, selectedDate, firestore, allStudents, allSubjects]);
     
     const filteredWarnings = useMemo(() => {
-         return allWarnings.filter(warn => {
-            const subjectMatch = !selectedSubjectId || warn.subjectId === selectedSubjectId;
-            return subjectMatch;
-        });
+         if (!selectedSubjectId) {
+            return [];
+         }
+         return allWarnings.filter(warn => warn.subjectId === selectedSubjectId);
     }, [allWarnings, selectedSubjectId]);
 
     const isLoading = isInitialLoading || isAttendanceLoading;
@@ -234,5 +234,3 @@ export default function AdminAttendancePage() {
     </>
   );
 }
-
-    
