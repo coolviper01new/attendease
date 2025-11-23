@@ -23,7 +23,7 @@ import {
 } from '@/components/ui/dialog';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useUser, useFirestore, useDoc, useCollection, useMemoFirebase } from '@/firebase';
-import { doc, collection, query, where, getDocs, updateDoc, getDoc, onSnapshot } from 'firebase/firestore';
+import { doc, collection, query, where, getDocs, updateDoc, onSnapshot } from 'firebase/firestore';
 import type { Student, Subject, Registration, Schedule, AttendanceSession, Attendance } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
@@ -277,10 +277,10 @@ export default function StudentDashboardPage() {
   
    useEffect(() => {
     if (areRegsLoading || !userRegistrations) {
-        setAreSubjectsLoading(true);
-        return;
-    };
-    
+      setAreSubjectsLoading(true);
+      return;
+    }
+
     if (userRegistrations.length === 0) {
       setEnrolledSubjects([]);
       setAreSubjectsLoading(false);
@@ -288,32 +288,32 @@ export default function StudentDashboardPage() {
     }
 
     const subjectIds = userRegistrations.map(reg => reg.subjectId);
-    
+    if (subjectIds.length === 0) {
+      setEnrolledSubjects([]);
+      setAreSubjectsLoading(false);
+      return;
+    }
+
     const q = query(collection(firestore, 'subjects'), where('__name__', 'in', subjectIds));
 
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
-        setEnrolledSubjects(prevSubjects => {
-            const subjectsMap = new Map(prevSubjects.map(s => [s.id, s]));
-            
-            querySnapshot.docChanges().forEach((change) => {
-                const changedDoc = { ...change.doc.data(), id: change.doc.id } as Subject;
-                if (change.type === "added" || change.type === "modified") {
-                    subjectsMap.set(change.doc.id, changedDoc);
-                } else if (change.type === "removed") {
-                    subjectsMap.delete(change.doc.id);
-                }
-            });
-
-            return Array.from(subjectsMap.values());
+      let subjectsFromSnapshot: Subject[] = [];
+       querySnapshot.forEach(doc => {
+          subjectsFromSnapshot.push({ ...doc.data(), id: doc.id } as Subject);
         });
+
+      setEnrolledSubjects(subjectsFromSnapshot);
+      if (areSubjectsLoading) {
         setAreSubjectsLoading(false);
+      }
+
     }, (error) => {
-        console.error("Error fetching enrolled subjects in real-time", error);
-        setAreSubjectsLoading(false);
+      console.error("Error fetching enrolled subjects in real-time", error);
+      setAreSubjectsLoading(false);
     });
 
     return () => unsubscribe();
-  }, [userRegistrations, areRegsLoading, firestore]);
+  }, [userRegistrations, areRegsLoading, firestore, areSubjectsLoading]);
   
 
   const handleRegisterDevice = async () => {
