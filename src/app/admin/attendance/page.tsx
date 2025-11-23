@@ -158,7 +158,7 @@ export default function AdminAttendancePage() {
     
     const filteredWarnings = useMemo(() => {
          if (!selectedSubjectId) {
-            return [];
+            return allWarnings;
          }
          return allWarnings.filter(warn => warn.subjectId === selectedSubjectId);
     }, [allWarnings, selectedSubjectId]);
@@ -234,3 +234,5 @@ export default function AdminAttendancePage() {
     </>
   );
 }
+
+    

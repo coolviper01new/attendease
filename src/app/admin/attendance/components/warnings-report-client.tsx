@@ -91,7 +91,7 @@ export function WarningsReportClient({ data, isLoading }: WarningsReportClientPr
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
 
   const table = useReactTable({
-    data: data || [],
+    data: data ?? [],
     columns,
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
@@ -160,3 +160,5 @@ export function WarningsReportClient({ data, isLoading }: WarningsReportClientPr
     </div>
   );
 }
+
+    
