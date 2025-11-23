@@ -1,9 +1,3 @@
-
-
-
-
-
-
 export type SchoolYear = {
   id: string;
   name: string;
@@ -120,6 +114,9 @@ export type Admin = User & {
   name: string;
 };
 
-    
-
-    
+export type ImagePlaceholder = {
+  id: string;
+  description: string;
+  url: string;
+  hint: string;
+};

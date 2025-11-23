@@ -13,6 +13,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { placeholderImages } from "@/lib/placeholder-images";
 
 const ActionsCell = ({ row }: { row: any }) => {
     const faculty = row.original as Admin;
@@ -52,18 +53,23 @@ export const getColumns = (): ColumnDef<Admin>[] => [
         </Button>
       );
     },
-    cell: ({ row }) => (
-      <div className="pl-4 flex items-center gap-3">
-        <Avatar>
-            <AvatarImage src={row.original.avatarUrl} />
-            <AvatarFallback>{row.original.firstName?.charAt(0)}{row.original.lastName?.charAt(0)}</AvatarFallback>
-        </Avatar>
-        <div>
-            <div className="font-medium">{row.original.firstName} {row.original.lastName}</div>
-            <div className="text-xs text-muted-foreground">{row.original.email}</div>
+    cell: ({ row }) => {
+      const faculty = row.original;
+      const avatar = placeholderImages.find(p => p.id === 'admin-avatar') || placeholderImages[0];
+
+      return (
+        <div className="pl-4 flex items-center gap-3">
+          <Avatar>
+              <AvatarImage src={faculty.avatarUrl || avatar.url} data-ai-hint={avatar.hint} />
+              <AvatarFallback>{faculty.firstName?.charAt(0)}{faculty.lastName?.charAt(0)}</AvatarFallback>
+          </Avatar>
+          <div>
+              <div className="font-medium">{faculty.firstName} {faculty.lastName}</div>
+              <div className="text-xs text-muted-foreground">{faculty.email}</div>
+          </div>
         </div>
-      </div>
-    ),
+      );
+    },
   },
   {
     accessorKey: "facultyId",

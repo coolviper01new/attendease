@@ -34,6 +34,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useState } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { placeholderImages } from "@/lib/placeholder-images";
 
 
 const DeregistrationApprovalDialog = ({ student }: { student: Student }) => {
@@ -213,18 +214,23 @@ export const getColumns = (): ColumnDef<Student>[] => [
         </Button>
       );
     },
-    cell: ({ row }) => (
-      <div className="pl-4 flex items-center gap-3">
-        <Avatar>
-            <AvatarImage src={row.original.avatarUrl} />
-            <AvatarFallback>{row.original.firstName?.charAt(0)}{row.original.lastName?.charAt(0)}</AvatarFallback>
-        </Avatar>
-        <div>
-            <div className="font-medium">{row.original.firstName} {row.original.lastName}</div>
-            <div className="text-xs text-muted-foreground">{row.original.email}</div>
+    cell: ({ row }) => {
+      const student = row.original;
+      const avatar = placeholderImages[parseInt(student.id.slice(-1), 16) % placeholderImages.length];
+
+      return (
+        <div className="pl-4 flex items-center gap-3">
+          <Avatar>
+              <AvatarImage src={student.avatarUrl || avatar.url} data-ai-hint={avatar.hint} />
+              <AvatarFallback>{student.firstName?.charAt(0)}{student.lastName?.charAt(0)}</AvatarFallback>
+          </Avatar>
+          <div>
+              <div className="font-medium">{student.firstName} {student.lastName}</div>
+              <div className="text-xs text-muted-foreground">{student.email}</div>
+          </div>
         </div>
-      </div>
-    ),
+      );
+    },
   },
   {
     accessorKey: "studentNumber",
@@ -248,5 +254,3 @@ export const getColumns = (): ColumnDef<Student>[] => [
     cell: ActionsCell,
   },
 ];
-
-    

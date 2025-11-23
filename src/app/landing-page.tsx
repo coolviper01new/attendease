@@ -13,6 +13,9 @@ import {
   BarChart,
   QrCode,
   ShieldCheck,
+  Smartphone,
+  PieChart,
+  UserCheck,
 } from 'lucide-react';
 
 const features = [
@@ -23,13 +26,13 @@ const features = [
       'Students can quickly mark their attendance by generating a unique QR code on their registered device, ensuring a seamless and secure check-in process.',
   },
   {
-    icon: BarChart,
+    icon: PieChart,
     title: 'Real-time Monitoring',
     description:
       'Administrators can monitor attendance in real-time, view detailed reports, and track attendance statistics to gain insights into student presence.',
   },
   {
-    icon: ShieldCheck,
+    icon: UserCheck,
     title: 'Enhanced Security',
     description:
       'Device registration ensures that only the authorized student can generate a QR code, preventing fraudulent check-ins and maintaining data integrity.',
