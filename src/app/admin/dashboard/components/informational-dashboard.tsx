@@ -2,7 +2,7 @@
 'use client';
 import { StatCard } from "@/components/stat-card";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Users, Book, Clock, AlertTriangle, ListChecks } from "lucide-react";
+import { Users, Book, Clock, AlertTriangle } from "lucide-react";
 import type { DashboardData } from "../page";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -15,24 +15,27 @@ interface DashboardProps {
 
 export function InformationalDashboard({ data, isLoading }: DashboardProps) {
 
-    const today = useMemo(() => new Date().toLocaleDateString('en-US', { weekday: 'long' }), []);
+    const today = useMemo(() => {
+        if (typeof window === 'undefined') return '';
+        return new Date().toLocaleDateString('en-US', { weekday: 'long' });
+    }, []);
 
     const todaysSubjects = useMemo(() => {
-        if (!data?.subjects) return [];
+        if (!data?.subjects || !today) return [];
         return data.subjects
             .filter(subject => 
-                subject.lectureSchedules.some(s => s.day === today) || 
+                subject.lectureSchedules?.some(s => s.day === today) || 
                 subject.labSchedules?.some(s => s.day === today)
             )
             .sort((a, b) => {
-                const aTime = a.lectureSchedules.find(s => s.day === today)?.startTime || '23:59';
-                const bTime = b.lectureSchedules.find(s => s.day === today)?.startTime || '23:59';
+                const aTime = a.lectureSchedules?.find(s => s.day === today)?.startTime || '23:59';
+                const bTime = b.lectureSchedules?.find(s => s.day === today)?.startTime || '23:59';
                 return aTime.localeCompare(bTime);
             });
     }, [data?.subjects, today]);
     
     const todaysWarnings = useMemo(() => {
-        if (!data?.warnings) return 0;
+        if (!data?.warnings || typeof window === 'undefined') return 0;
         const todayStr = new Date().toISOString().split('T')[0];
         return data.warnings.filter(w => w.date.startsWith(todayStr)).length;
     }, [data?.warnings]);
@@ -87,7 +90,7 @@ export function InformationalDashboard({ data, isLoading }: DashboardProps) {
                             </TableHeader>
                             <TableBody>
                                 {todaysSubjects.length > 0 ? todaysSubjects.flatMap(subject => 
-                                    subject.lectureSchedules
+                                    (subject.lectureSchedules || [])
                                         .filter(s => s.day === today)
                                         .map((schedule, i) => (
                                             <TableRow key={`${subject.id}-lec-${i}`}>

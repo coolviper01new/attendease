@@ -7,7 +7,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 
 interface DashboardProps {
@@ -18,7 +17,7 @@ interface DashboardProps {
 export function TacticalDashboard({ data, isLoading }: DashboardProps) {
 
     const atRiskStudents = useMemo(() => {
-        if (!data || !data.attendance || !data.students) return [];
+        if (!data?.attendance || !data.students) return [];
         const absenceCounts: { [studentId: string]: number } = {};
 
         data.attendance.forEach(att => {
@@ -40,15 +39,15 @@ export function TacticalDashboard({ data, isLoading }: DashboardProps) {
             })
             .filter(item => item.student && item.absenceCount > 3) // Threshold for "at-risk"
             .sort((a, b) => b.absenceCount - a.absenceCount);
-    }, [data]);
+    }, [data?.attendance, data?.students]);
     
     const lowAttendanceSubjects = useMemo(() => {
-        if (!data || !data.subjects || !data.registrations || !data.attendance) return [];
+        if (!data?.subjects || !data.registrations || !data.attendance) return [];
         
         return data.subjects.map(subject => {
-            const subjectRegistrations = data.registrations.filter(r => r.subjectId === subject.id);
+            const subjectRegistrations = data.registrations?.filter(r => r.subjectId === subject.id) || [];
             const totalPossibleAttendances = subjectRegistrations.length * 20; // Simplified assumption for a semester
-            const subjectAttendanceRecords = data.attendance.filter(a => a.subjectId === subject.id && a.status === 'present');
+            const subjectAttendanceRecords = data.attendance?.filter(a => a.subjectId === subject.id && a.status === 'present') || [];
             
             if (totalPossibleAttendances === 0) {
                  return { ...subject, rate: 100 }; // Default to 100 if no one is enrolled
@@ -61,7 +60,7 @@ export function TacticalDashboard({ data, isLoading }: DashboardProps) {
         })
         .filter(s => s.rate < 85) // Threshold for "low attendance"
         .sort((a,b) => a.rate - b.rate);
-    }, [data]);
+    }, [data?.subjects, data?.registrations, data?.attendance]);
 
 
     if (isLoading) {

@@ -27,23 +27,23 @@ export function StrategicDashboard({ data, isLoading }: DashboardProps) {
             }
         });
         return Object.entries(counts).map(([name, value]) => ({ name, value }));
-    }, [data]);
+    }, [data?.students]);
     
      const attendanceByYearLevel = useMemo(() => {
-        if (!data || !data.subjects || !data.registrations || !data.attendance) return [];
+        if (!data?.subjects || !data.registrations || !data.attendance) return [];
         
         const yearLevels = ['1', '2', '3', '4'];
         
         return yearLevels.map(year => {
             // Find all subjects for this year level
-            const subjectsForYear = data.subjects.filter(s => s.yearLevel === year);
+            const subjectsForYear = data.subjects?.filter(s => s.yearLevel === year) || [];
             const subjectIds = new Set(subjectsForYear.map(s => s.id));
             
             // Get all attendance records for those subjects
-            const yearAttendance = data.attendance.filter(a => subjectIds.has(a.subjectId));
+            const yearAttendance = data.attendance?.filter(a => subjectIds.has(a.subjectId)) || [];
             
             // Get registrations for those subjects
-            const yearRegistrations = data.registrations.filter(r => subjectIds.has(r.subjectId));
+            const yearRegistrations = data.registrations?.filter(r => subjectIds.has(r.subjectId)) || [];
             
             const presentCount = yearAttendance.filter(a => a.status === 'present').length;
             const totalPossibleAttendances = yearRegistrations.length * 20; // Simplified assumption
@@ -58,7 +58,7 @@ export function StrategicDashboard({ data, isLoading }: DashboardProps) {
                 'Attendance Rate': parseFloat(rate.toFixed(1))
             };
         });
-    }, [data]);
+    }, [data?.subjects, data?.registrations, data?.attendance]);
 
     if (isLoading) {
         return (

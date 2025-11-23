@@ -8,7 +8,7 @@ import { ResponsiveContainer, BarChart, XAxis, YAxis, Tooltip, Legend, Bar, Line
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import { eachDayOfInterval, format, subDays, startOfDay } from 'date-fns';
+import { eachDayOfInterval, format, subDays } from 'date-fns';
 
 interface DashboardProps {
     data: DashboardData | null;
@@ -25,12 +25,13 @@ export function AnalyticalDashboard({ data, isLoading }: DashboardProps) {
 
         const attendanceByDate = dateRange.map(date => {
             const dateStr = format(date, 'yyyy-MM-dd');
-            const totalForDay = data.attendance.filter(a => format(a.timestamp?.toDate(), 'yyyy-MM-dd') === dateStr);
+            const totalForDay = data.attendance.filter(a => a.timestamp && format(a.timestamp.toDate(), 'yyyy-MM-dd') === dateStr);
             const presentCount = totalForDay.filter(a => a.status === 'present').length;
-            const totalRegistrationsForDay = new Set(totalForDay.map(a => `${a.studentId}-${a.subjectId}`)).size;
             
-            // Avoid division by zero
-            const rate = totalRegistrationsForDay > 0 ? (presentCount / totalRegistrationsForDay) * 100 : 0;
+            // Note: This is a simplified calculation. For accuracy, we'd need to know how many students were *supposed* to be present.
+            // For now, we'll base the rate on how many attendance records were created for that day.
+            const totalRecordsForDay = totalForDay.length;
+            const rate = totalRecordsForDay > 0 ? (presentCount / totalRecordsForDay) * 100 : 0;
             
             return {
                 date: format(date, 'MMM d'),
@@ -38,7 +39,7 @@ export function AnalyticalDashboard({ data, isLoading }: DashboardProps) {
             };
         });
         return attendanceByDate;
-    }, [data]);
+    }, [data?.attendance]);
     
     const absenceByDayData = useMemo(() => {
         if (!data?.attendance) return [];
@@ -46,23 +47,25 @@ export function AnalyticalDashboard({ data, isLoading }: DashboardProps) {
         const absenceCounts = days.map(day => ({ day, Absences: 0 }));
 
         data.attendance.forEach(record => {
-            if (record.status === 'absent') {
+            if (record.status === 'absent' && record.timestamp) {
                 const dayIndex = record.timestamp.toDate().getDay();
                 absenceCounts[dayIndex].Absences++;
             }
         });
         
-        // Return only weekdays with data
+        // Return only weekdays
         return absenceCounts.slice(1, 6);
-    }, [data]);
+    }, [data?.attendance]);
     
      const subjectPerformanceData = useMemo(() => {
-        if (!data || !data.subjects || !data.registrations || !data.attendance) return [];
+        if (!data?.subjects || !data.registrations || !data.attendance) return [];
         
         return data.subjects.map(subject => {
-            const subjectRegistrations = data.registrations.filter(r => r.subjectId === subject.id);
-            const totalPossibleAttendances = subjectRegistrations.length * 20; // Simplified assumption
-            const subjectAttendanceRecords = data.attendance.filter(a => a.subjectId === subject.id && a.status === 'present');
+            const subjectRegistrations = data.registrations?.filter(r => r.subjectId === subject.id) || [];
+            // A simplified assumption: e.g., 20 sessions per subject in a semester.
+            // A more accurate approach would count the actual number of sessions held.
+            const totalPossibleAttendances = subjectRegistrations.length * 20; 
+            const subjectAttendanceRecords = data.attendance?.filter(a => a.subjectId === subject.id && a.status === 'present') || [];
             
             if (totalPossibleAttendances === 0) {
                  return { name: `${subject.name} (${subject.block})`, rate: 0 };
@@ -73,7 +76,7 @@ export function AnalyticalDashboard({ data, isLoading }: DashboardProps) {
                 rate: parseFloat(rate.toFixed(1))
             };
         }).sort((a,b) => a.rate - b.rate); // Sort from worst to best
-    }, [data]);
+    }, [data?.subjects, data?.registrations, data?.attendance]);
 
     if (isLoading) {
         return (
