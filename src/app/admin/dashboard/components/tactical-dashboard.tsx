@@ -37,7 +37,7 @@ export function TacticalDashboard({ data, isLoading }: DashboardProps) {
                     absenceCount: count
                 };
             })
-            .filter(item => item.student && item.absenceCount > 3) // Threshold for "at-risk"
+            .filter(item => item.student && item.absenceCount > 3) 
             .sort((a, b) => b.absenceCount - a.absenceCount);
     }, [data?.attendance, data?.students]);
     
@@ -46,11 +46,11 @@ export function TacticalDashboard({ data, isLoading }: DashboardProps) {
         
         return data.subjects.map(subject => {
             const subjectRegistrations = data.registrations?.filter(r => r.subjectId === subject.id) || [];
-            const totalPossibleAttendances = subjectRegistrations.length * 20; // Simplified assumption for a semester
+            const totalPossibleAttendances = subjectRegistrations.length * 20; 
             const subjectAttendanceRecords = data.attendance?.filter(a => a.subjectId === subject.id && a.status === 'present') || [];
             
             if (totalPossibleAttendances === 0) {
-                 return { ...subject, rate: 100 }; // Default to 100 if no one is enrolled
+                 return { ...subject, rate: 100 }; 
             }
             const rate = (subjectAttendanceRecords.length / totalPossibleAttendances) * 100;
             return {
@@ -58,7 +58,7 @@ export function TacticalDashboard({ data, isLoading }: DashboardProps) {
                 rate: parseFloat(rate.toFixed(1))
             };
         })
-        .filter(s => s.rate < 85) // Threshold for "low attendance"
+        .filter(s => s.rate < 85) 
         .sort((a,b) => a.rate - b.rate);
     }, [data?.subjects, data?.registrations, data?.attendance]);
 
@@ -112,7 +112,7 @@ export function TacticalDashboard({ data, isLoading }: DashboardProps) {
                             )) : (
                                  <TableRow>
                                     <TableCell colSpan={3} className="h-24 text-center">No students are currently at-risk.</TableCell>
-                                </TableRow>
+                                 </TableRow>
                             )}
                         </TableBody>
                     </Table>

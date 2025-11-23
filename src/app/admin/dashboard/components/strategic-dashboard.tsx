@@ -35,18 +35,14 @@ export function StrategicDashboard({ data, isLoading }: DashboardProps) {
         const yearLevels = ['1', '2', '3', '4'];
         
         return yearLevels.map(year => {
-            // Find all subjects for this year level
             const subjectsForYear = data.subjects?.filter(s => s.yearLevel === year) || [];
             const subjectIds = new Set(subjectsForYear.map(s => s.id));
             
-            // Get all attendance records for those subjects
             const yearAttendance = data.attendance?.filter(a => subjectIds.has(a.subjectId)) || [];
-            
-            // Get registrations for those subjects
             const yearRegistrations = data.registrations?.filter(r => subjectIds.has(r.subjectId)) || [];
             
             const presentCount = yearAttendance.filter(a => a.status === 'present').length;
-            const totalPossibleAttendances = yearRegistrations.length * 20; // Simplified assumption
+            const totalPossibleAttendances = yearRegistrations.length * 20;
             
             if (totalPossibleAttendances === 0) {
                  return { name: `${year}${year === '1' ? 'st' : year === '2' ? 'nd' : year === '3' ? 'rd' : 'th'} Year`, 'Attendance Rate': 0 };

@@ -25,11 +25,16 @@ export function AnalyticalDashboard({ data, isLoading }: DashboardProps) {
 
         const attendanceByDate = dateRange.map(date => {
             const dateStr = format(date, 'yyyy-MM-dd');
-            const totalForDay = data.attendance.filter(a => a.timestamp && format(a.timestamp.toDate(), 'yyyy-MM-dd') === dateStr);
+            const totalForDay = data.attendance.filter(a => {
+                // Defensive check for timestamp and toDate method
+                const timestamp = a.timestamp;
+                if (timestamp && typeof timestamp.toDate === 'function') {
+                    return format(timestamp.toDate(), 'yyyy-MM-dd') === dateStr;
+                }
+                return false;
+            });
             const presentCount = totalForDay.filter(a => a.status === 'present').length;
             
-            // Note: This is a simplified calculation. For accuracy, we'd need to know how many students were *supposed* to be present.
-            // For now, we'll base the rate on how many attendance records were created for that day.
             const totalRecordsForDay = totalForDay.length;
             const rate = totalRecordsForDay > 0 ? (presentCount / totalRecordsForDay) * 100 : 0;
             
@@ -47,13 +52,14 @@ export function AnalyticalDashboard({ data, isLoading }: DashboardProps) {
         const absenceCounts = days.map(day => ({ day, Absences: 0 }));
 
         data.attendance.forEach(record => {
-            if (record.status === 'absent' && record.timestamp) {
-                const dayIndex = record.timestamp.toDate().getDay();
+            // Defensive check for timestamp and toDate method
+            const timestamp = record.timestamp;
+            if (record.status === 'absent' && timestamp && typeof timestamp.toDate === 'function') {
+                const dayIndex = timestamp.toDate().getDay();
                 absenceCounts[dayIndex].Absences++;
             }
         });
         
-        // Return only weekdays
         return absenceCounts.slice(1, 6);
     }, [data?.attendance]);
     
@@ -62,8 +68,6 @@ export function AnalyticalDashboard({ data, isLoading }: DashboardProps) {
         
         return data.subjects.map(subject => {
             const subjectRegistrations = data.registrations?.filter(r => r.subjectId === subject.id) || [];
-            // A simplified assumption: e.g., 20 sessions per subject in a semester.
-            // A more accurate approach would count the actual number of sessions held.
             const totalPossibleAttendances = subjectRegistrations.length * 20; 
             const subjectAttendanceRecords = data.attendance?.filter(a => a.subjectId === subject.id && a.status === 'present') || [];
             
@@ -75,7 +79,7 @@ export function AnalyticalDashboard({ data, isLoading }: DashboardProps) {
                 name: `${subject.name} (${subject.block})`,
                 rate: parseFloat(rate.toFixed(1))
             };
-        }).sort((a,b) => a.rate - b.rate); // Sort from worst to best
+        }).sort((a,b) => a.rate - b.rate);
     }, [data?.subjects, data?.registrations, data?.attendance]);
 
     if (isLoading) {

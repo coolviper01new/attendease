@@ -37,7 +37,7 @@ export function InformationalDashboard({ data, isLoading }: DashboardProps) {
     const todaysWarnings = useMemo(() => {
         if (!data?.warnings || typeof window === 'undefined') return 0;
         const todayStr = new Date().toISOString().split('T')[0];
-        return data.warnings.filter(w => w.date.startsWith(todayStr)).length;
+        return data.warnings.filter(w => w.date && w.date.startsWith(todayStr)).length;
     }, [data?.warnings]);
 
     const stats = {
@@ -89,7 +89,7 @@ export function InformationalDashboard({ data, isLoading }: DashboardProps) {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {todaysSubjects.length > 0 ? todaysSubjects.flatMap(subject => 
+                                {todaysSubjects && todaysSubjects.length > 0 ? todaysSubjects.flatMap(subject => 
                                     (subject.lectureSchedules || [])
                                         .filter(s => s.day === today)
                                         .map((schedule, i) => (
@@ -124,10 +124,14 @@ export function InformationalDashboard({ data, isLoading }: DashboardProps) {
                             <TableBody>
                                {data?.activeSessions && data.activeSessions.length > 0 ? data.activeSessions.map(session => {
                                    const subject = data.subjects?.find(s => s.id === session.subjectId);
+                                   // Defensive check for startTime and toDate method
+                                   const startTime = session.startTime && typeof session.startTime.toDate === 'function' 
+                                                     ? session.startTime.toDate().toLocaleTimeString() 
+                                                     : 'N/A';
                                    return (
                                         <TableRow key={session.id}>
                                            <TableCell>{subject ? `${subject.name} (${subject.block})` : 'Unknown Subject'}</TableCell>
-                                           <TableCell>{session.startTime?.toDate().toLocaleTimeString() || 'N/A'}</TableCell>
+                                           <TableCell>{startTime}</TableCell>
                                        </TableRow>
                                    )
                                }) : (
