@@ -12,7 +12,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { QrCode, Clock, BookOpen, AlertTriangle, CalendarCheck, Info, CheckCircle2, ListChecks } from 'lucide-react';
+import { QrCode, Clock, BookOpen, AlertTriangle, CalendarCheck, Info, CheckCircle2, Smartphone, ShieldCheck, ShieldAlert } from 'lucide-react';
 import Image from 'next/image';
 import {
   Dialog,
@@ -24,13 +24,14 @@ import {
 } from '@/components/ui/dialog';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useUser, useFirestore, useDoc, useCollection, useMemoFirebase } from '@/firebase';
-import { doc, collection, query, where, getDocs, updateDoc, onSnapshot, serverTimestamp } from 'firebase/firestore';
-import type { Student, Subject, Registration, Schedule, AttendanceSession, Attendance } from '@/lib/types';
+import { doc, collection, query, where, updateDoc, serverTimestamp, getDocs } from 'firebase/firestore';
+import type { Student, Subject, Registration, Schedule, Attendance } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { AttendanceDialog } from './components/attendance-dialog';
+import { Progress } from '@/components/ui/progress';
 
 const QrCodeDialog = ({
   studentId,
@@ -110,32 +111,59 @@ const QrCodeDialog = ({
 };
 
 
-const SubjectCard = ({ subjectId, student, isClient, isDeviceRegistered, isCurrentDevice, onRegisterDevice, isToday }: {
+const SubjectCard = ({ subjectId, student }: {
     subjectId: string;
     student: Student | null;
-    isClient: boolean;
-    isDeviceRegistered: boolean;
-    isCurrentDevice: boolean;
-    onRegisterDevice: () => void;
-    isToday?: boolean;
 }) => {
     const firestore = useFirestore();
+    const [isClient, setIsClient] = useState(false);
+    const [currentDeviceId, setCurrentDeviceId] = useState<string | null>(null);
     const [isAttendanceDialogOpen, setIsAttendanceDialogOpen] = useState(false);
     const [isConfirmed, setIsConfirmed] = useState(false);
     const [countdown, setCountdown] = useState(5);
     
-    const subjectDocRef = useMemoFirebase(() => {
-        return doc(firestore, 'subjects', subjectId);
-    }, [subjectId]); // Dependency array is critical for stability
-    
+    const subjectDocRef = useMemoFirebase(() => doc(firestore, 'subjects', subjectId), [firestore, subjectId]);
     const { data: subject, isLoading: isSubjectLoading } = useDoc<Subject>(subjectDocRef);
+    
+    const studentAttendanceQuery = useMemoFirebase(() => {
+        if (!student) return null;
+        return query(
+            collection(firestore, 'users', student.id, 'registrations'),
+            where('subjectId', '==', subjectId)
+        )
+    }, [firestore, student, subjectId]);
 
+    const studentAttendanceForSubjectQuery = useMemoFirebase(() => {
+        if (!student) return null;
+        return query(
+            collection(firestore, `subjects/${subjectId}/attendanceSessions`),
+        )
+    }, [firestore, student, subjectId])
+
+    const {data: attendanceRecords, isLoading: isAttendanceLoading} = useCollection<Attendance>(
+        useMemoFirebase(() => {
+            if(!student) return null;
+            return query(
+                collectionGroup(firestore, 'attendance'),
+                where('studentId', '==', student.id),
+                where('subjectId', '==', subjectId)
+            )
+        }, [firestore, student, subjectId])
+    );
+    
     const studentAttendanceDocRef = useMemoFirebase(() => {
         if (!subject?.isSessionActive || !student || !subject.activeSessionId) return null;
         return doc(firestore, `subjects/${subject.id}/attendanceSessions/${subject.activeSessionId}/attendance`, student.id);
     }, [firestore, subject, student]);
 
     const { data: attendanceRecord } = useDoc<Attendance>(studentAttendanceDocRef);
+
+    useEffect(() => {
+        setIsClient(true);
+        const deviceId = localStorage.getItem('deviceId') || `device-${Math.random()}`;
+        localStorage.setItem('deviceId', deviceId);
+        setCurrentDeviceId(deviceId);
+    }, []);
 
     const isPresent = !!attendanceRecord;
 
@@ -158,32 +186,39 @@ const SubjectCard = ({ subjectId, student, isClient, isDeviceRegistered, isCurre
         return () => clearInterval(timer);
     }, [isConfirmed, countdown]);
 
-    const getTodaySchedules = (schedules: Schedule[] = [], day: string) => {
-        return schedules.filter(sc => sc.day === day);
-    }
-    
-    const today = new Date().toLocaleDateString('en-US', { weekday: 'long' });
-    
+    const handleRegisterDevice = async () => {
+        if (!student || !currentDeviceId) return;
+        const userDocRef = doc(firestore, 'users', student.id);
+        const deviceData = { deviceId: currentDeviceId };
+        
+        updateDoc(userDocRef, deviceData).then(() => {
+            // Re-fetch student data implicitly by state change in parent if needed
+        }).catch(error => {
+          errorEmitter.emit('permission-error', new FirestorePermissionError({
+            path: userDocRef.path,
+            operation: 'update',
+            requestResourceData: deviceData
+          }))
+        })
+    };
+
     if (isSubjectLoading) {
         return (
-            <Card><CardHeader><Skeleton className="h-6 w-3/4" /></CardHeader><CardContent><Skeleton className="h-4 w-1/2" /></CardContent><CardFooter><Skeleton className="h-10 w-full" /></CardFooter></Card>
+            <Card><CardHeader><Skeleton className="h-6 w-3/4" /></CardHeader><CardContent><Skeleton className="h-4 w-1/2" /><Skeleton className="h-8 w-full mt-2" /></CardContent><CardFooter><Skeleton className="h-10 w-full" /></CardFooter></Card>
         );
     }
 
-    if (!subject) {
-        return null;
-    }
+    if (!subject) return null;
+    
+    const isDeviceRegistered = !!student?.deviceId;
+    const isCurrentDevice = isDeviceRegistered && student?.deviceId === currentDeviceId;
 
-    const todayLecSchedules = getTodaySchedules(subject.lectureSchedules, today);
-    const todayLabSchedules = getTodaySchedules(subject.labSchedules, today);
-
-    const schedulesToShow = isToday ? [...todayLecSchedules, ...todayLabSchedules] : subject.lectureSchedules;
-    const labSchedulesToShow = isToday ? [] : subject.labSchedules;
+    const totalAttendance = attendanceRecords?.length ?? 0;
+    const attendancePercentage = totalAttendance > 0 ? (totalAttendance / 20) * 100 : 0; // Assuming 20 total classes for percentage
 
     const renderFooter = () => {
-        if (!isClient || !student) {
-            return null;
-        }
+        if (!isClient || !student) return null;
+
         if (isConfirmed) {
             return (
                 <div className="w-full text-center p-4 bg-green-600/10 rounded-md">
@@ -205,10 +240,14 @@ const SubjectCard = ({ subjectId, student, isClient, isDeviceRegistered, isCurre
                 subject={subject}
                 isDeviceRegistered={isDeviceRegistered}
                 isCurrentDevice={isCurrentDevice}
-                onRegister={onRegisterDevice}
+                onRegister={handleRegisterDevice}
             />
         );
     }
+    
+    const today = new Date().toLocaleDateString('en-US', { weekday: 'long' });
+    const todaySchedules = [...(subject.lectureSchedules || []), ...(subject.labSchedules || [])].filter(s => s.day === today);
+
 
     return (
         <Card key={subject.id} className="flex flex-col hover:border-primary/50 transition-colors">
@@ -226,35 +265,35 @@ const SubjectCard = ({ subjectId, student, isClient, isDeviceRegistered, isCurre
               </div>
             </CardHeader>
             <CardContent className="flex-grow space-y-3">
-              {schedulesToShow.map((schedule, index) => (
-                <div key={`lec-${index}`} className="flex items-center text-sm text-muted-foreground">
-                  <Clock className="mr-2 h-4 w-4 flex-shrink-0" />
-                  <span className="truncate font-medium text-foreground">
-                    {isToday ? '' : 'Lec: '}{schedule.day}, {schedule.startTime} - {schedule.endTime} @ {schedule.room}
-                  </span>
+                 {todaySchedules.map((schedule, index) => (
+                    <div key={`sched-${index}`} className="flex items-center text-sm text-muted-foreground">
+                    <Clock className="mr-2 h-4 w-4 flex-shrink-0" />
+                    <span className="truncate font-medium text-foreground">
+                        {schedule.startTime} - {schedule.endTime} @ {schedule.room}
+                    </span>
+                    </div>
+                ))}
+                 <div className="pt-2">
+                    <div className="flex justify-between items-center mb-1">
+                        <span className="text-xs font-medium text-muted-foreground">ATTENDANCE</span>
+                        <span className="text-xs font-semibold">{totalAttendance} / 20</span>
+                    </div>
+                    <Progress value={attendancePercentage} className="h-2" />
                 </div>
-              ))}
-              {labSchedulesToShow?.map((schedule, index) => (
-                <div key={`lab-${index}`} className="flex items-center text-sm text-muted-foreground">
-                  <Clock className="mr-2 h-4 w-4 flex-shrink-0" />
-                  <span className="truncate">
-                    Lab: {schedule.day}, {schedule.startTime} - {schedule.endTime} @ {schedule.room}
-                  </span>
-                </div>
-              ))}
             </CardContent>
-            <CardFooter className='flex-col gap-2 items-stretch'>
-              {renderFooter()}
-               <AttendanceDialog 
-                subject={subject} 
-                student={student}
-                isOpen={isAttendanceDialogOpen}
-                onOpenChange={setIsAttendanceDialogOpen}
-              />
+            <CardFooter className='flex-col gap-2 items-stretch pt-4'>
+                {renderFooter()}
+                <AttendanceDialog 
+                    subject={subject} 
+                    student={student}
+                    isOpen={isAttendanceDialogOpen}
+                    onOpenChange={setIsAttendanceDialogOpen}
+                />
             </CardFooter>
           </Card>
-    )
-}
+    );
+};
+
 
 export default function StudentDashboardPage() {
   const { user, isUserLoading } = useUser();
@@ -262,13 +301,13 @@ export default function StudentDashboardPage() {
   
   const [currentDeviceId, setCurrentDeviceId] = useState<string | null>(null);
   const [isClient, setIsClient] = useState(false);
-  const [deviceRegAlert, setDeviceRegAlert] = useState<string | null>(null);
+  const [deviceRegAlert, setDeviceRegAlert] = useState<{title: string, description: string} | null>(null);
 
   const userDocRef = useMemoFirebase(() => {
       if (!user) return null;
       return doc(firestore, 'users', user.uid);
   }, [user, firestore]);
-  const { data: student, isLoading: isStudentLoading } = useDoc<Student>(userDocRef);
+  const { data: student, isLoading: isStudentLoading, forceRefresh: refreshStudent } = useDoc<Student>(userDocRef);
   
   const registrationsQuery = useMemoFirebase(() => {
     if (!user) return null;
@@ -277,12 +316,6 @@ export default function StudentDashboardPage() {
   const { data: userRegistrations, isLoading: areRegsLoading } = useCollection<Registration>(registrationsQuery);
   
   const enrolledSubjectIds = useMemo(() => userRegistrations?.map(reg => reg.subjectId) ?? [], [userRegistrations]);
-
-  const subjectsQuery = useMemoFirebase(() => {
-    if (enrolledSubjectIds.length === 0) return null;
-    return query(collection(firestore, 'subjects'), where('__name__', 'in', enrolledSubjectIds));
-  }, [enrolledSubjectIds, firestore]);
-  const { data: enrolledSubjects, isLoading: areSubjectsLoading } = useCollection<Subject>(subjectsQuery);
 
   useEffect(() => {
     setIsClient(true);
@@ -296,7 +329,8 @@ export default function StudentDashboardPage() {
     const deviceData = { deviceId: currentDeviceId };
     
     updateDoc(userDocRef, deviceData).then(() => {
-      setDeviceRegAlert("This device has been successfully registered for QR code generation.");
+      setDeviceRegAlert({title: "Device Registered", description: "This device can now be used for QR code generation."});
+      refreshStudent(); // Re-fetches the student data to update the UI
     }).catch(error => {
       errorEmitter.emit('permission-error', new FirestorePermissionError({
         path: userDocRef.path,
@@ -305,19 +339,31 @@ export default function StudentDashboardPage() {
       }))
     })
   };
-
+  
   const isDeviceRegistered = !!student?.deviceId;
   const isCurrentDevice = isDeviceRegistered && student?.deviceId === currentDeviceId;
-  const isLoading = isUserLoading || isStudentLoading || areRegsLoading || areSubjectsLoading;
+  const isLoading = isUserLoading || isStudentLoading || areRegsLoading;
   
   const todayWeekday = useMemo(() => new Date().toLocaleDateString('en-US', { weekday: 'long' }), []);
   
+  // This requires fetching all subjects, then filtering.
+  // In a larger app, this might be optimized with a more complex query or data structure.
+  const [allSubjects, setAllSubjects] = useState<Subject[]>([]);
+  useEffect(() => {
+    if(enrolledSubjectIds.length > 0) {
+        const q = query(collection(firestore, 'subjects'), where('__name__', 'in', enrolledSubjectIds));
+        getDocs(q).then(snapshot => {
+            setAllSubjects(snapshot.docs.map(d => ({id: d.id, ...d.data()} as Subject)));
+        });
+    }
+  }, [enrolledSubjectIds, firestore]);
+
   const todaysSubjectIds = useMemo(() => 
-    enrolledSubjects?.filter(subject => 
-        subject.lectureSchedules.some(s => s.day === todayWeekday) || 
-        subject.labSchedules?.some(s => s.day === todayWeekday)
+    allSubjects?.filter(subject => 
+        (subject.lectureSchedules || []).some(s => s.day === todayWeekday) || 
+        (subject.labSchedules || []).some(s => s.day === todayWeekday)
     ).map(s => s.id) ?? [], 
-  [enrolledSubjects, todayWeekday]);
+  [allSubjects, todayWeekday]);
 
   if (isLoading) {
     return (
@@ -326,22 +372,18 @@ export default function StudentDashboardPage() {
                 title="My Dashboard"
                 description="Loading your schedule and subjects..."
             />
-            <div className="space-y-6">
-                <div>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="lg:col-span-2 space-y-6">
                     <Skeleton className="h-8 w-48 mb-4" />
-                    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                    <div className="grid gap-6 md:grid-cols-2">
                         {[...Array(2)].map((_, i) => (
-                            <Card key={i}><CardHeader><Skeleton className="h-6 w-3/4" /></CardHeader><CardContent><Skeleton className="h-4 w-1/2" /></CardContent><CardFooter><Skeleton className="h-10 w-full" /></CardFooter></Card>
+                            <Card key={i}><CardHeader><Skeleton className="h-6 w-3/4" /></CardHeader><CardContent><Skeleton className="h-4 w-1/2" /><Skeleton className="h-8 w-full mt-2" /></CardContent><CardFooter><Skeleton className="h-10 w-full" /></CardFooter></Card>
                         ))}
                     </div>
                 </div>
-                <div>
-                    <Skeleton className="h-8 w-48 mb-4" />
-                    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                        {[...Array(3)].map((_, i) => (
-                            <Card key={i}><CardHeader><Skeleton className="h-6 w-3/4" /></CardHeader><CardContent><Skeleton className="h-4 w-1/2" /></CardContent><CardFooter><Skeleton className="h-10 w-full" /></CardFooter></Card>
-                        ))}
-                    </div>
+                <div className="space-y-6">
+                     <Skeleton className="h-32 w-full" />
+                     <Skeleton className="h-48 w-full" />
                 </div>
             </div>
         </>
@@ -351,86 +393,116 @@ export default function StudentDashboardPage() {
   return (
     <>
       <PageHeader
-        title="My Dashboard"
-        description={`Welcome back, ${student?.firstName || 'student'}! Here's what's happening.`}
+        title={`Welcome, ${student?.firstName || 'Student'}!`}
+        description={`Here's your summary for ${new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}.`}
       />
 
       {deviceRegAlert && (
         <Alert className="mb-6">
-          <AlertTitle>Device Registered</AlertTitle>
-          <AlertDescription>{deviceRegAlert}</AlertDescription>
+          <CheckCircle2 className="h-4 w-4" />
+          <AlertTitle>{deviceRegAlert.title}</AlertTitle>
+          <AlertDescription>{deviceRegAlert.description}</AlertDescription>
         </Alert>
       )}
 
-      {isClient && !isDeviceRegistered && !deviceRegAlert && (
-        <Alert className="mb-6 bg-blue-500/10 border-blue-500/20 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300 dark:border-blue-900">
-          <Info className="h-4 w-4" />
-          <AlertTitle>Device Registration Required</AlertTitle>
-          <AlertDescription className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-            To generate QR codes for attendance, you must register your primary device. This is a one-time action.
-            <Button onClick={handleRegisterDevice} size="sm" className="mt-2 sm:mt-0 sm:ml-4 w-full sm:w-auto">Register This Device</Button>
-          </AlertDescription>
-        </Alert>
-      )}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="lg:col-span-2 space-y-8">
+            <div>
+                <h2 className="text-2xl font-headline font-bold mb-4 flex items-center gap-2">
+                    <CalendarCheck className="w-6 h-6 text-primary"/>
+                    Today's Schedule
+                </h2>
+                {todaysSubjectIds.length > 0 ? (
+                    <div className="grid gap-6 md:grid-cols-2">
+                        {todaysSubjectIds.map(subjectId => (
+                            <SubjectCard 
+                                key={subjectId}
+                                subjectId={subjectId}
+                                student={student}
+                            />
+                        ))}
+                    </div>
+                ) : (
+                    <Card className="mt-6 border-dashed">
+                        <CardContent className="pt-6">
+                            <p className="text-center text-muted-foreground py-12">You have no classes scheduled for today. Enjoy your day off!</p>
+                        </CardContent>
+                    </Card>
+                )}
+            </div>
 
-    <div className="space-y-8">
-        <div>
-            <h2 className="text-2xl font-headline font-bold mb-4 flex items-center gap-2">
-                <CalendarCheck className="w-6 h-6 text-primary"/>
-                Today's Schedule
-            </h2>
-             {todaysSubjectIds.length > 0 ? (
-                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                    {todaysSubjectIds.map(subjectId => (
-                        <SubjectCard 
-                            key={subjectId}
-                            subjectId={subjectId}
-                            student={student}
-                            isClient={isClient}
-                            isDeviceRegistered={isDeviceRegistered}
-                            isCurrentDevice={isCurrentDevice}
-                            onRegisterDevice={handleRegisterDevice}
-                            isToday={true}
-                        />
-                    ))}
-                </div>
-             ) : (
-                <Card className="mt-6 border-dashed">
-                    <CardContent className="pt-6">
-                        <p className="text-center text-muted-foreground">You have no classes scheduled for today. Enjoy your day off!</p>
-                    </CardContent>
-                </Card>
-             )}
-        </div>
-        
-        <Separator />
+            <Separator />
 
-        <div>
-             <h2 className="text-2xl font-headline font-bold mb-4">All My Subjects</h2>
-             {enrolledSubjectIds.length > 0 ? (
-                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                    {enrolledSubjectIds.map((subjectId) => (
-                        <SubjectCard 
-                            key={subjectId}
-                            subjectId={subjectId}
-                            student={student}
-                            isClient={isClient}
-                            isDeviceRegistered={isDeviceRegistered}
-                            isCurrentDevice={isCurrentDevice}
-                            onRegisterDevice={handleRegisterDevice}
-                        />
-                    ))}
-                </div>
-              ) : (
-                 <Card className="mt-6 border-dashed">
-                    <CardContent className="pt-6">
-                        <p className="text-center text-muted-foreground">You are not enrolled in any subjects. Go to the Enrollment page to get started.</p>
-                    </CardContent>
-                </Card>
-              )}
+            <div>
+                <h2 className="text-2xl font-headline font-bold mb-4">All My Subjects</h2>
+                {enrolledSubjectIds.length > 0 ? (
+                    <div className="grid gap-6 md:grid-cols-2">
+                        {enrolledSubjectIds.map((subjectId) => (
+                             <SubjectCard 
+                                key={subjectId}
+                                subjectId={subjectId}
+                                student={student}
+                            />
+                        ))}
+                    </div>
+                ) : (
+                    <Card className="mt-6 border-dashed">
+                        <CardContent className="pt-6">
+                            <p className="text-center text-muted-foreground py-12">You are not enrolled in any subjects. Go to the Enrollment page to get started.</p>
+                        </CardContent>
+                    </Card>
+                )}
+            </div>
         </div>
-    </div>
-      
+
+        <aside className="space-y-6">
+            <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                        {isDeviceRegistered ? <ShieldCheck className="text-green-500" /> : <ShieldAlert className="text-yellow-500" />}
+                        Device Status
+                    </CardTitle>
+                </CardHeader>
+                <CardContent>
+                    {isClient && !isDeviceRegistered ? (
+                        <Alert variant="default" className="bg-yellow-500/10 border-yellow-500/20 text-yellow-600 dark:text-yellow-400">
+                            <AlertTriangle className="h-4 w-4" />
+                            <AlertTitle>Device Not Registered</AlertTitle>
+                            <AlertDescription>
+                                You must register this device to generate attendance QR codes.
+                            </AlertDescription>
+                            <Button onClick={handleRegisterDevice} size="sm" className="mt-4 w-full">Register This Device</Button>
+                        </Alert>
+                    ) : isClient && !isCurrentDevice ? (
+                         <Alert variant="destructive">
+                            <AlertTriangle className="h-4 w-4" />
+                            <AlertTitle>Device Mismatch</AlertTitle>
+                            <AlertDescription>
+                                This is not your registered device. QR code generation is disabled.
+                            </AlertDescription>
+                        </Alert>
+                    ) : (
+                        <Alert variant="default" className="bg-green-500/10 border-green-500/20 text-green-600 dark:text-green-400">
+                           <ShieldCheck className="h-4 w-4" />
+                            <AlertTitle>Device Registered</AlertTitle>
+                            <AlertDescription>
+                                This device is authorized to generate attendance QR codes.
+                            </AlertDescription>
+                        </Alert>
+                    )}
+                </CardContent>
+            </Card>
+            <Card>
+                <CardHeader>
+                    <CardTitle>Attendance Overview</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <p className="text-sm text-muted-foreground">A summary of your attendance across all subjects will be shown here.</p>
+                </CardContent>
+            </Card>
+        </aside>
+      </div>
     </>
   );
 }
+
