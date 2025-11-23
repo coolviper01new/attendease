@@ -6,6 +6,7 @@ import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { doc } from 'firebase/firestore';
 import type { User } from '@/lib/types';
 import { LandingPage } from './landing-page';
+import { Loader2 } from 'lucide-react';
 
 export default function AppRoot() {
   const router = useRouter();
@@ -33,9 +34,12 @@ export default function AppRoot() {
   if (isLoading) {
     return (
       <div className="flex h-screen w-full items-center justify-center bg-background">
-        <div className="text-center">
-          <p className="text-lg font-semibold">AttendEase</p>
-          <p className="text-sm text-muted-foreground">Loading your experience...</p>
+        <div className="flex flex-col items-center gap-4 text-center">
+            <Loader2 className="h-10 w-10 animate-spin text-primary" />
+            <div>
+                <p className="text-lg font-semibold">AttendEase</p>
+                <p className="text-sm text-muted-foreground">Loading your experience...</p>
+            </div>
         </div>
       </div>
     );
@@ -50,9 +54,12 @@ export default function AppRoot() {
   // This state is temporary before the useEffect redirects.
   return (
     <div className="flex h-screen w-full items-center justify-center bg-background">
-        <div className="text-center">
-          <p className="text-lg font-semibold">AttendEase</p>
-          <p className="text-sm text-muted-foreground">Redirecting to your dashboard...</p>
+        <div className="flex flex-col items-center gap-4 text-center">
+            <Loader2 className="h-10 w-10 animate-spin text-primary" />
+            <div>
+                <p className="text-lg font-semibold">AttendEase</p>
+                <p className="text-sm text-muted-foreground">Redirecting to your dashboard...</p>
+            </div>
         </div>
       </div>
   );
