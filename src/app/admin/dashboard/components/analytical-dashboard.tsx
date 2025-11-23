@@ -18,7 +18,7 @@ interface DashboardProps {
 export function AnalyticalDashboard({ data, isLoading }: DashboardProps) {
 
     const attendanceTrendData = useMemo(() => {
-        if (!data) return [];
+        if (!data?.attendance) return [];
         const endDate = new Date();
         const startDate = subDays(endDate, 29);
         const dateRange = eachDayOfInterval({ start: startDate, end: endDate });
@@ -41,7 +41,7 @@ export function AnalyticalDashboard({ data, isLoading }: DashboardProps) {
     }, [data]);
     
     const absenceByDayData = useMemo(() => {
-        if (!data) return [];
+        if (!data?.attendance) return [];
         const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
         const absenceCounts = days.map(day => ({ day, Absences: 0 }));
 
@@ -57,7 +57,7 @@ export function AnalyticalDashboard({ data, isLoading }: DashboardProps) {
     }, [data]);
     
      const subjectPerformanceData = useMemo(() => {
-        if (!data || !data.registrations || data.registrations.length === 0) return [];
+        if (!data || !data.subjects || !data.registrations || !data.attendance) return [];
         
         return data.subjects.map(subject => {
             const subjectRegistrations = data.registrations.filter(r => r.subjectId === subject.id);

@@ -16,7 +16,7 @@ const COLORS = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3
 export function StrategicDashboard({ data, isLoading }: DashboardProps) {
 
     const enrollmentByCourse = useMemo(() => {
-        if (!data) return [];
+        if (!data?.students) return [];
         const counts: { [course: string]: number } = {};
         data.students.forEach(student => {
             if (student.course) {
@@ -30,7 +30,7 @@ export function StrategicDashboard({ data, isLoading }: DashboardProps) {
     }, [data]);
     
      const attendanceByYearLevel = useMemo(() => {
-        if (!data || !data.registrations || data.registrations.length === 0) return [];
+        if (!data || !data.subjects || !data.registrations || !data.attendance) return [];
         
         const yearLevels = ['1', '2', '3', '4'];
         

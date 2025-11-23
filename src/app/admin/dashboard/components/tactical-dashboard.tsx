@@ -18,7 +18,7 @@ interface DashboardProps {
 export function TacticalDashboard({ data, isLoading }: DashboardProps) {
 
     const atRiskStudents = useMemo(() => {
-        if (!data) return [];
+        if (!data || !data.attendance || !data.students) return [];
         const absenceCounts: { [studentId: string]: number } = {};
 
         data.attendance.forEach(att => {
@@ -43,7 +43,7 @@ export function TacticalDashboard({ data, isLoading }: DashboardProps) {
     }, [data]);
     
     const lowAttendanceSubjects = useMemo(() => {
-        if (!data || !data.registrations.length) return [];
+        if (!data || !data.subjects || !data.registrations || !data.attendance) return [];
         
         return data.subjects.map(subject => {
             const subjectRegistrations = data.registrations.filter(r => r.subjectId === subject.id);
