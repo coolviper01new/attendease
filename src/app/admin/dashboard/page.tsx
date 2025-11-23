@@ -105,7 +105,7 @@ export default function AdminDashboardPage() {
 
 
     return (
-        <>
+        <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
             <PageHeader
                 title="Dashboard"
                 description="Your central hub for insights and class management."
@@ -130,6 +130,6 @@ export default function AdminDashboardPage() {
                     <StrategicDashboard data={dashboardData} isLoading={isLoading} />
                 </TabsContent>
             </Tabs>
-        </>
+        </div>
     );
 }

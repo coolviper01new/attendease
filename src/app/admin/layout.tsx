@@ -34,7 +34,7 @@ export default function AdminLayout({
 
   return (
     <SidebarProvider>
-      <div className="container flex items-center justify-between p-4 md:hidden">
+      <div className="flex items-center justify-between p-4 md:hidden">
         <Link href="/" className="flex items-center gap-2 font-bold font-headline">
             <AppWindow className="h-6 w-6 text-primary" />
             <span>AttendEase</span>
