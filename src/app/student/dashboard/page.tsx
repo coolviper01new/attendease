@@ -295,21 +295,26 @@ export default function StudentDashboardPage() {
     }
 
     const q = query(collection(firestore, 'subjects'), where('__name__', 'in', subjectIds));
-
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
-      let subjectsFromSnapshot: Subject[] = [];
-       querySnapshot.forEach(doc => {
-          subjectsFromSnapshot.push({ ...doc.data(), id: doc.id } as Subject);
+        setEnrolledSubjects(prevSubjects => {
+            const subjectsMap = new Map(prevSubjects.map(s => [s.id, s]));
+            querySnapshot.docChanges().forEach(change => {
+                const docData = change.doc.data();
+                const subject = { ...docData, id: change.doc.id } as Subject;
+                if (change.type === "removed") {
+                    subjectsMap.delete(subject.id);
+                } else {
+                    subjectsMap.set(subject.id, subject);
+                }
+            });
+            return Array.from(subjectsMap.values());
         });
-
-      setEnrolledSubjects(subjectsFromSnapshot);
-      if (areSubjectsLoading) {
-        setAreSubjectsLoading(false);
-      }
-
+        if (areSubjectsLoading) {
+            setAreSubjectsLoading(false);
+        }
     }, (error) => {
-      console.error("Error fetching enrolled subjects in real-time", error);
-      setAreSubjectsLoading(false);
+        console.error("Error fetching enrolled subjects in real-time", error);
+        setAreSubjectsLoading(false);
     });
 
     return () => unsubscribe();
