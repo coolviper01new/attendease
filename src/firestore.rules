@@ -90,14 +90,14 @@ service cloud.firestore {
      *               Allows an admin to query by subject and date for reporting.
      */
     match /{path=**}/attendance/{attendanceId} {
-        allow list: if isSignedIn() && request.query.where.studentId == request.auth.uid
+        allow list: if (isSignedIn() && request.query.where.studentId == request.auth.uid)
                     || (isAdmin() && request.query.where.subjectId is string && request.query.where.date is string);
     }
     
     match /{path=**}/registrations/{registrationId} {
       allow list: if isAdmin() && request.query.where.subjectId is string;
     }
-
+    
     match /{path=**}/warnings/{warningId} {
         allow list: if isAdmin();
     }
@@ -254,5 +254,3 @@ service cloud.firestore {
     }
   }
 }
-
-    
