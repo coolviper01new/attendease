@@ -85,7 +85,9 @@ export default function AdminDashboardPage() {
             }
         };
 
-        fetchDashboardData();
+        if (firestore) {
+            fetchDashboardData();
+        }
     }, [firestore]);
 
 
@@ -118,3 +120,5 @@ export default function AdminDashboardPage() {
         </>
     );
 }
+
+    
