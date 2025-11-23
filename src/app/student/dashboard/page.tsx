@@ -125,9 +125,8 @@ const SubjectCard = ({ subjectId, student, isClient, isDeviceRegistered, isCurre
     const [countdown, setCountdown] = useState(5);
     
     const subjectDocRef = useMemoFirebase(() => {
-        if (!subjectId) return null;
         return doc(firestore, 'subjects', subjectId);
-    }, [firestore, subjectId]);
+    }, [subjectId]); // Dependency array is critical for stability
     
     const { data: subject, isLoading: isSubjectLoading } = useDoc<Subject>(subjectDocRef);
 
